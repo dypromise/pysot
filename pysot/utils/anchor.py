@@ -16,6 +16,7 @@ class Anchors:
     """
     This class generate anchors.
     """
+
     def __init__(self, stride, ratios, scales, image_center=0, size=0):
         self.stride = stride
         self.ratios = ratios
@@ -37,13 +38,14 @@ class Anchors:
         size = self.stride * self.stride
         count = 0
         for r in self.ratios:
-            ws = int(math.sqrt(size*1. / r))
+            ws = int(math.sqrt(size * 1. / r))
             hs = int(ws * r)
 
             for s in self.scales:
                 w = ws * s
                 h = hs * s
-                self.anchors[count][:] = [-w*0.5, -h*0.5, w*0.5, h*0.5][:]
+                self.anchors[count][:] = [  # center at 0
+                    -w * 0.5, - h * 0.5, w * 0.5, h * 0.5][:]
                 count += 1
 
     def generate_all_anchors(self, im_c, size):
@@ -81,5 +83,5 @@ class Anchors:
         x1, y1, x2, y2 = center2corner([cx, cy, w, h])
 
         self.all_anchors = (np.stack([x1, y1, x2, y2]).astype(np.float32),
-                            np.stack([cx, cy, w,  h]).astype(np.float32))
+                            np.stack([cx, cy, w, h]).astype(np.float32))
         return True

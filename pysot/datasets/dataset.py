@@ -44,8 +44,8 @@ class SubDataset(object):
         for video in list(meta_data.keys()):
             for track in meta_data[video]:
                 frames = meta_data[video][track]
-                frames = list(map(int,
-                                  filter(lambda x: x.isdigit(), frames.keys())))
+                frames = list(map(int, filter(
+                    lambda x: x.isdigit(), frames.keys())))
                 frames.sort()
                 meta_data[video][track]['frames'] = frames
                 if len(frames) <= 0:
@@ -211,6 +211,7 @@ class TrkDataset(Dataset):
                 return dataset, index - dataset.start_idx
 
     def _get_bbox(self, image, shape):
+        """ return bbox in search image computed by ori image bbox."""
         imh, imw = image.shape[:2]
         if len(shape) == 4:
             w, h = shape[2] - shape[0], shape[3] - shape[1]

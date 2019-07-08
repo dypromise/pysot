@@ -15,7 +15,8 @@ for sub_set in sub_sets:
     videos = sorted(listdir(sub_set_base_path))
     s = []
     for vi, video in enumerate(videos):
-        print('subset: {} video id: {:04d} / {:04d}'.format(sub_set, vi, len(videos)))
+        print('subset: {} video id: {:04d} / {:04d}'.format(sub_set, vi,
+                                                            len(videos)))
         v = dict()
         v['base_path'] = join(sub_set, video)
         v['frame'] = []
@@ -35,8 +36,10 @@ for sub_set in sub_sets:
                 occluded = int(object_iter.find('occluded').text)
                 o = dict()
                 o['c'] = name
-                o['bbox'] = [int(bndbox.find('xmin').text), int(bndbox.find('ymin').text),
-                             int(bndbox.find('xmax').text), int(bndbox.find('ymax').text)]
+                o['bbox'] = [int(bndbox.find('xmin').text),
+                             int(bndbox.find('ymin').text),
+                             int(bndbox.find('xmax').text),
+                             int(bndbox.find('ymax').text)]
                 o['trackid'] = trackid
                 o['occ'] = occluded
                 objs.append(o)

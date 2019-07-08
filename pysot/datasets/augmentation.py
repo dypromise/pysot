@@ -68,6 +68,16 @@ class Augmentation:
         return image
 
     def _shift_scale_aug(self, image, bbox, crop_bbox, size):
+        """ dataaugg according for siamRPN++.
+        Params:
+            image: crop{}.jpg
+            bbox: bbox in crop{}.jpg
+            crop_bbox: crop region (before resize it to param `size`)
+            size: net input size.
+        Return:
+            image: crop and resized image adapt to net
+            bbox: target bbox in crop_resized image to net
+        """
         im_h, im_w = image.shape[:2]
 
         # adjust crop bounding box

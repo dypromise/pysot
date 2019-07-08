@@ -11,13 +11,14 @@ def check_size(frame_sz, bbox):
     min_ratio = 0.1
     max_ratio = 0.75
     # only accept objects >10% and <75% of the total frame
-    area_ratio = np.sqrt((bbox[2]-bbox[0])*(bbox[3]-bbox[1])/float(np.prod(frame_sz)))
+    area_ratio = np.sqrt((bbox[2] - bbox[0]) *
+                         (bbox[3] - bbox[1]) / float(np.prod(frame_sz)))
     ok = (area_ratio > min_ratio) and (area_ratio < max_ratio)
     return ok
 
 
 def check_borders(frame_sz, bbox):
-    dist_from_border = 0.05 * (bbox[2] - bbox[0] + bbox[3] - bbox[1])/2
+    dist_from_border = 0.05 * (bbox[2] - bbox[0] + bbox[3] - bbox[1]) / 2
     ok = (bbox[0] > dist_from_border) and (bbox[1] > dist_from_border) and \
          ((frame_sz[0] - bbox[2]) > dist_from_border) and \
          ((frame_sz[1] - bbox[3]) > dist_from_border)
@@ -57,8 +58,10 @@ for subset in vid:
             snippets[video['base_path']] = dict()
         for selected in id_set:
             frame_ids = sorted(id_frames[selected])
-            sequences = np.split(frame_ids, np.array(np.where(np.diff(frame_ids) > 1)[0]) + 1)
-            sequences = [s for s in sequences if len(s) > 1]  # remove isolated frame.
+            sequences = np.split(frame_ids, np.array(
+                np.where(np.diff(frame_ids) > 1)[0]) + 1)
+            # remove isolated frame.
+            sequences = [s for s in sequences if len(s) > 1]
             for seq in sequences:
                 snippet = dict()
                 for frame_id in seq:
@@ -68,12 +71,13 @@ for subset in vid:
                             o = obj
                             continue
                     snippet[frame['img_path'].split('.')[0]] = o['bbox']
-                snippets[video['base_path']]['{:02d}'.format(selected)] = snippet
+                snippets[video['base_path']
+                         ]['{:02d}'.format(selected)] = snippet
                 n_snippets += 1
         print('video: {:d} snippets_num: {:d}'.format(n_videos, n_snippets))
-        
-train = {k:v for (k,v) in snippets.items() if 'train' in k}
-val = {k:v for (k,v) in snippets.items() if 'val' in k}
+
+train = {k: v for (k, v) in snippets.items() if 'train' in k}
+val = {k: v for (k, v) in snippets.items() if 'val' in k}
 
 json.dump(train, open('train.json', 'w'), indent=4, sort_keys=True)
 json.dump(val, open('val.json', 'w'), indent=4, sort_keys=True)

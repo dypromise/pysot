@@ -52,7 +52,7 @@ class StepScheduler(LRScheduler):
             if start_lr is None:
                 start_lr = end_lr / (mult ** (epochs // step))
             else:  # for warm up policy
-                mult = math.pow(end_lr/start_lr, 1. / (epochs // step))
+                mult = math.pow(end_lr / start_lr, 1. / (epochs // step))
         self.start_lr = start_lr
         self.lr_spaces = self.start_lr * (mult**(np.arange(epochs) // step))
         self.mult = mult
@@ -69,7 +69,7 @@ class MultiStepScheduler(LRScheduler):
             if start_lr is None:
                 start_lr = end_lr / (mult ** (len(steps)))
             else:
-                mult = math.pow(end_lr/start_lr, 1. / len(steps))
+                mult = math.pow(end_lr / start_lr, 1. / len(steps))
         self.start_lr = start_lr
         self.lr_spaces = self._build_lr(start_lr, steps, mult, epochs)
         self.mult = mult
@@ -81,7 +81,7 @@ class MultiStepScheduler(LRScheduler):
         lr = [0] * epochs
         lr[0] = start_lr
         for i in range(1, epochs):
-            lr[i] = lr[i-1]
+            lr[i] = lr[i - 1]
             if i in steps:
                 lr[i] *= mult
         return np.array(lr, dtype=np.float32)
@@ -165,46 +165,46 @@ if __name__ == '__main__':
 
     # test1
     step = {
-            'type': 'step',
-            'start_lr': 0.01,
-            'step': 10,
-            'mult': 0.1
-            }
+        'type': 'step',
+        'start_lr': 0.01,
+        'step': 10,
+        'mult': 0.1
+    }
     lr = build_lr_scheduler(optimizer, step)
     print(lr)
 
     log = {
-            'type': 'log',
-            'start_lr': 0.03,
-            'end_lr': 5e-4,
-            }
+        'type': 'log',
+        'start_lr': 0.03,
+        'end_lr': 5e-4,
+    }
     lr = build_lr_scheduler(optimizer, log)
 
     print(lr)
 
     log = {
-            'type': 'multi-step',
-            "start_lr": 0.01,
-            "mult": 0.1,
-            "steps": [10, 15, 20]
-            }
+        'type': 'multi-step',
+        "start_lr": 0.01,
+        "mult": 0.1,
+        "steps": [10, 15, 20]
+    }
     lr = build_lr_scheduler(optimizer, log)
     print(lr)
 
     cos = {
-            "type": 'cos',
-            'start_lr': 0.01,
-            'end_lr': 0.0005,
-            }
+        "type": 'cos',
+        'start_lr': 0.01,
+        'end_lr': 0.0005,
+    }
     lr = build_lr_scheduler(optimizer, cos)
     print(lr)
 
     step = {
-            'type': 'step',
-            'start_lr': 0.001,
-            'end_lr': 0.03,
-            'step': 1,
-            }
+        'type': 'step',
+        'start_lr': 0.001,
+        'end_lr': 0.03,
+        'step': 1,
+    }
 
     warmup = log.copy()
     warmup['warmup'] = step
