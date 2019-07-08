@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 
 from pysot.utils.bbox import corner2center, \
-        Center, center2corner, Corner
+    Center, center2corner, Corner
 
 
 class Augmentation:
@@ -20,9 +20,9 @@ class Augmentation:
         self.flip = flip
         self.color = color
         self.rgbVar = np.array(
-            [[-0.55919361,  0.98062831, - 0.41940627],
-             [1.72091413,  0.19879334, - 1.82968581],
-             [4.64467907,  4.73710203, 4.88324118]], dtype=np.float32)
+            [[-0.55919361, 0.98062831, - 0.41940627],
+             [1.72091413, 0.19879334, - 1.82968581],
+             [4.64467907, 4.73710203, 4.88324118]], dtype=np.float32)
 
     @staticmethod
     def random():
@@ -30,8 +30,8 @@ class Augmentation:
 
     def _crop_roi(self, image, bbox, out_sz, padding=(0, 0, 0)):
         bbox = [float(x) for x in bbox]
-        a = (out_sz-1) / (bbox[2]-bbox[0])
-        b = (out_sz-1) / (bbox[3]-bbox[1])
+        a = (out_sz - 1) / (bbox[2] - bbox[0])
+        b = (out_sz - 1) / (bbox[3] - bbox[1])
         c = -a * bbox[0]
         d = -b * bbox[1]
         mapping = np.array([[a, 0, c],
@@ -46,10 +46,10 @@ class Augmentation:
             sizes = np.arange(5, 46, 2)
             size = np.random.choice(sizes)
             kernel = np.zeros((size, size))
-            c = int(size/2)
+            c = int(size / 2)
             wx = np.random.random()
             kernel[:, c] += 1. / size * wx
-            kernel[c, :] += 1. / size * (1-wx)
+            kernel[c, :] += 1. / size * (1 - wx)
             return kernel
         kernel = rand_kernel()
         image = cv2.filter2D(image, -1, kernel)
@@ -116,8 +116,8 @@ class Augmentation:
 
     def __call__(self, image, bbox, size, gray=False):
         shape = image.shape
-        crop_bbox = center2corner(Center(shape[0]//2, shape[1]//2,
-                                         size-1, size-1))
+        crop_bbox = center2corner(Center(shape[0] // 2, shape[1] // 2,
+                                         size - 1, size - 1))
         # gray augmentation
         if gray:
             image = self._gray_aug(image)

@@ -45,7 +45,7 @@ class SubDataset(object):
             for track in meta_data[video]:
                 frames = meta_data[video][track]
                 frames = list(map(int,
-                              filter(lambda x: x.isdigit(), frames.keys())))
+                                  filter(lambda x: x.isdigit(), frames.keys())))
                 frames.sort()
                 meta_data[video][track]['frames'] = frames
                 if len(frames) <= 0:
@@ -116,7 +116,7 @@ class SubDataset(object):
         frames = track_info['frames']
         template_frame = np.random.randint(0, len(frames))
         left = max(template_frame - self.frame_range, 0)
-        right = min(template_frame + self.frame_range, len(frames)-1) + 1
+        right = min(template_frame + self.frame_range, len(frames) - 1) + 1
         search_range = frames[left:right]
         template_frame = frames[template_frame]
         search_frame = np.random.choice(search_range)
@@ -157,13 +157,13 @@ class TrkDataset(Dataset):
         for name in cfg.DATASET.NAMES:
             subdata_cfg = getattr(cfg.DATASET, name)
             sub_dataset = SubDataset(
-                    name,
-                    subdata_cfg.ROOT,
-                    subdata_cfg.ANNO,
-                    subdata_cfg.FRAME_RANGE,
-                    subdata_cfg.NUM_USE,
-                    start
-                )
+                name,
+                subdata_cfg.ROOT,
+                subdata_cfg.ANNO,
+                subdata_cfg.FRAME_RANGE,
+                subdata_cfg.NUM_USE,
+                start
+            )
             start += sub_dataset.num
             self.num += sub_dataset.num_use
 
@@ -172,19 +172,19 @@ class TrkDataset(Dataset):
 
         # data augmentation
         self.template_aug = Augmentation(
-                cfg.DATASET.TEMPLATE.SHIFT,
-                cfg.DATASET.TEMPLATE.SCALE,
-                cfg.DATASET.TEMPLATE.BLUR,
-                cfg.DATASET.TEMPLATE.FLIP,
-                cfg.DATASET.TEMPLATE.COLOR
-            )
+            cfg.DATASET.TEMPLATE.SHIFT,
+            cfg.DATASET.TEMPLATE.SCALE,
+            cfg.DATASET.TEMPLATE.BLUR,
+            cfg.DATASET.TEMPLATE.FLIP,
+            cfg.DATASET.TEMPLATE.COLOR
+        )
         self.search_aug = Augmentation(
-                cfg.DATASET.SEARCH.SHIFT,
-                cfg.DATASET.SEARCH.SCALE,
-                cfg.DATASET.SEARCH.BLUR,
-                cfg.DATASET.SEARCH.FLIP,
-                cfg.DATASET.SEARCH.COLOR
-            )
+            cfg.DATASET.SEARCH.SHIFT,
+            cfg.DATASET.SEARCH.SCALE,
+            cfg.DATASET.SEARCH.BLUR,
+            cfg.DATASET.SEARCH.FLIP,
+            cfg.DATASET.SEARCH.COLOR
+        )
         videos_per_epoch = cfg.DATASET.VIDEOS_PER_EPOCH
         self.num = videos_per_epoch if videos_per_epoch > 0 else self.num
         self.num *= cfg.TRAIN.EPOCH
@@ -213,18 +213,18 @@ class TrkDataset(Dataset):
     def _get_bbox(self, image, shape):
         imh, imw = image.shape[:2]
         if len(shape) == 4:
-            w, h = shape[2]-shape[0], shape[3]-shape[1]
+            w, h = shape[2] - shape[0], shape[3] - shape[1]
         else:
             w, h = shape
         context_amount = 0.5
         exemplar_size = cfg.TRAIN.EXEMPLAR_SIZE
-        wc_z = w + context_amount * (w+h)
-        hc_z = h + context_amount * (w+h)
+        wc_z = w + context_amount * (w + h)
+        hc_z = h + context_amount * (w + h)
         s_z = np.sqrt(wc_z * hc_z)
         scale_z = exemplar_size / s_z
-        w = w*scale_z
-        h = h*scale_z
-        cx, cy = imw//2, imh//2
+        w = w * scale_z
+        h = h * scale_z
+        cx, cy = imw // 2, imh // 2
         bbox = center2corner(Center(cx, cy, w, h))
         return bbox
 
@@ -266,14 +266,14 @@ class TrkDataset(Dataset):
 
         # get labels
         cls, delta, delta_weight, overlap = self.anchor_target(
-                bbox, cfg.TRAIN.OUTPUT_SIZE, neg)
+            bbox, cfg.TRAIN.OUTPUT_SIZE, neg)
         template = template.transpose((2, 0, 1)).astype(np.float32)
         search = search.transpose((2, 0, 1)).astype(np.float32)
         return {
-                'template': template,
-                'search': search,
-                'label_cls': cls,
-                'label_loc': delta,
-                'label_loc_weight': delta_weight,
-                'bbox': np.array(bbox)
-                }
+            'template': template,
+            'search': search,
+            'label_cls': cls,
+            'label_loc': delta,
+            'label_loc_weight': delta_weight,
+            'bbox': np.array(bbox)
+        }

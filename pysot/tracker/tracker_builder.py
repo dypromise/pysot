@@ -11,10 +11,10 @@ from pysot.tracker.siammask_tracker import SiamMaskTracker
 from pysot.tracker.siamrpnlt_tracker import SiamRPNLTTracker
 
 TRACKS = {
-          'SiamRPNTracker': SiamRPNTracker,
-          'SiamMaskTracker': SiamMaskTracker,
-          'SiamRPNLTTracker': SiamRPNLTTracker
-         }
+    'SiamRPNTracker': SiamRPNTracker,
+    'SiamMaskTracker': SiamMaskTracker,
+    'SiamRPNLTTracker': SiamRPNLTTracker
+}
 
 
 def build_tracker(model):

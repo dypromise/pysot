@@ -38,7 +38,7 @@ def get_frames(video_name):
             else:
                 break
     elif video_name.endswith('avi') or \
-        video_name.endswith('mp4'):
+            video_name.endswith('mp4'):
         cap = cv2.VideoCapture(args.video_name)
         while True:
             ret, frame = cap.read()
@@ -66,7 +66,8 @@ def main():
 
     # load model
     model.load_state_dict(torch.load(args.snapshot,
-        map_location=lambda storage, loc: storage.cpu()))
+                                     map_location=lambda storage,
+                                     loc: storage.cpu()))
     model.eval().to(device)
 
     # build tracker
@@ -94,12 +95,12 @@ def main():
                               True, (0, 255, 0), 3)
                 mask = ((outputs['mask'] > cfg.TRACK.MASK_THERSHOLD) * 255)
                 mask = mask.astype(np.uint8)
-                mask = np.stack([mask, mask*255, mask]).transpose(1, 2, 0)
+                mask = np.stack([mask, mask * 255, mask]).transpose(1, 2, 0)
                 frame = cv2.addWeighted(frame, 0.77, mask, 0.23, -1)
             else:
                 bbox = list(map(int, outputs['bbox']))
                 cv2.rectangle(frame, (bbox[0], bbox[1]),
-                              (bbox[0]+bbox[2], bbox[1]+bbox[3]),
+                              (bbox[0] + bbox[2], bbox[1] + bbox[3]),
                               (0, 255, 0), 3)
             cv2.imshow(video_name, frame)
             cv2.waitKey(40)

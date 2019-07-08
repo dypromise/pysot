@@ -24,7 +24,7 @@ from torch.utils.data.distributed import DistributedSampler
 from pysot.utils.lr_scheduler import build_lr_scheduler
 from pysot.utils.log_helper import init_log, print_speed, add_file_handler
 from pysot.utils.distributed import dist_init, DistModule, reduce_gradients,\
-        average_reduce, get_rank, get_world_size
+    average_reduce, get_rank, get_world_size
 from pysot.utils.model_load import load_pretrain, restore_from
 from pysot.utils.average_meter import AverageMeter
 from pysot.utils.misc import describe, commit
@@ -136,12 +136,12 @@ def log_grads(model, tb_writer, tb_index):
         else:
             rpn_norm += _norm ** 2
 
-        tb_writer.add_scalar('grad_all/'+k.replace('.', '/'),
+        tb_writer.add_scalar('grad_all/' + k.replace('.', '/'),
                              _norm, tb_index)
-        tb_writer.add_scalar('weight_all/'+k.replace('.', '/'),
+        tb_writer.add_scalar('weight_all/' + k.replace('.', '/'),
                              w_norm, tb_index)
-        tb_writer.add_scalar('w-g/'+k.replace('.', '/'),
-                             w_norm/(1e-20 + _norm), tb_index)
+        tb_writer.add_scalar('w-g/' + k.replace('.', '/'),
+                             w_norm / (1e-20 + _norm), tb_index)
     tot_norm = feature_norm + rpn_norm
     tot_norm = tot_norm ** 0.5
     feature_norm = feature_norm ** 0.5
@@ -179,10 +179,10 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
 
             if get_rank() == 0:
                 torch.save(
-                        {'epoch': epoch,
-                         'state_dict': model.module.state_dict(),
-                         'optimizer': optimizer.state_dict()},
-                        cfg.TRAIN.SNAPSHOT_DIR+'/checkpoint_e%d.pth' % (epoch))
+                    {'epoch': epoch,
+                     'state_dict': model.module.state_dict(),
+                     'optimizer': optimizer.state_dict()},
+                    cfg.TRAIN.SNAPSHOT_DIR + '/checkpoint_e%d.pth' % (epoch))
 
             if epoch == cfg.TRAIN.EPOCH:
                 return
@@ -194,14 +194,14 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
 
             lr_scheduler.step(epoch)
             cur_lr = lr_scheduler.get_cur_lr()
-            logger.info('epoch: {}'.format(epoch+1))
+            logger.info('epoch: {}'.format(epoch + 1))
 
         tb_idx = idx
         if idx % num_per_epoch == 0 and idx != 0:
             for idx, pg in enumerate(optimizer.param_groups):
-                logger.info('epoch {} lr {}'.format(epoch+1, pg['lr']))
+                logger.info('epoch {} lr {}'.format(epoch + 1, pg['lr']))
                 if rank == 0:
-                    tb_writer.add_scalar('lr/group{}'.format(idx+1),
+                    tb_writer.add_scalar('lr/group{}'.format(idx + 1),
                                          pg['lr'], tb_idx)
 
         data_time = average_reduce(time.time() - end)
@@ -236,19 +236,19 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
             for k, v in batch_info.items():
                 tb_writer.add_scalar(k, v, tb_idx)
 
-            if (idx+1) % cfg.TRAIN.PRINT_FREQ == 0:
+            if (idx + 1) % cfg.TRAIN.PRINT_FREQ == 0:
                 info = "Epoch: [{}][{}/{}] lr: {:.6f}\n".format(
-                            epoch+1, (idx+1) % num_per_epoch,
-                            num_per_epoch, cur_lr)
+                    epoch + 1, (idx + 1) % num_per_epoch,
+                    num_per_epoch, cur_lr)
                 for cc, (k, v) in enumerate(batch_info.items()):
                     if cc % 2 == 0:
                         info += ("\t{:s}\t").format(
-                                getattr(average_meter, k))
+                            getattr(average_meter, k))
                     else:
                         info += ("{:s}\n").format(
-                                getattr(average_meter, k))
+                            getattr(average_meter, k))
                 logger.info(info)
-                print_speed(idx+1+start_epoch*num_per_epoch,
+                print_speed(idx + 1 + start_epoch * num_per_epoch,
                             average_meter.batch_time.avg,
                             cfg.TRAIN.EPOCH * num_per_epoch)
         end = time.time()

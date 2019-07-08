@@ -16,7 +16,7 @@ from pysot.tracker.base_tracker import SiameseTracker
 class SiamRPNTracker(SiameseTracker):
     def __init__(self, model):
         super(SiamRPNTracker, self).__init__()
-        self.score_size = (cfg.TRACK.INSTANCE_SIZE - cfg.TRACK.EXEMPLAR_SIZE) // \
+        self.score_size = (cfg.TRACK.INSTANCE_SIZE - cfg.TRACK.EXEMPLAR_SIZE) //\
             cfg.ANCHOR.STRIDE + 1 + cfg.TRACK.BASE_SIZE
         self.anchor_num = len(cfg.ANCHOR.RATIOS) * len(cfg.ANCHOR.SCALES)
         hanning = np.hanning(self.score_size)
@@ -32,16 +32,19 @@ class SiamRPNTracker(SiameseTracker):
                           cfg.ANCHOR.SCALES)
         anchor = anchors.anchors
         x1, y1, x2, y2 = anchor[:, 0], anchor[:, 1], anchor[:, 2], anchor[:, 3]
-        anchor = np.stack([(x1+x2)*0.5, (y1+y2)*0.5, x2-x1, y2-y1], 1)
+        anchor = np.stack([(x1 + x2) * 0.5, (y1 + y2) * 0.5,
+                           x2 - x1, y2 - y1], 1)
         total_stride = anchors.stride
         anchor_num = anchor.shape[0]
         anchor = np.tile(anchor, score_size * score_size).reshape((-1, 4))
         ori = - (score_size // 2) * total_stride
-        xx, yy = np.meshgrid([ori + total_stride * dx for dx in range(score_size)],
-                             [ori + total_stride * dy for dy in range(score_size)])
+        xx, yy = np.meshgrid(
+            [ori + total_stride * dx for dx in range(score_size)],
+            [ori + total_stride * dy for dy in range(score_size)])
         xx, yy = np.tile(xx.flatten(), (anchor_num, 1)).flatten(), \
             np.tile(yy.flatten(), (anchor_num, 1)).flatten()
-        anchor[:, 0], anchor[:, 1] = xx.astype(np.float32), yy.astype(np.float32)
+        anchor[:, 0], anchor[:, 1] = xx.astype(
+            np.float32), yy.astype(np.float32)
         return anchor
 
     def _convert_bbox(self, delta, anchor):
@@ -55,7 +58,8 @@ class SiamRPNTracker(SiameseTracker):
         return delta
 
     def _convert_score(self, score):
-        score = score.permute(1, 2, 3, 0).contiguous().view(2, -1).permute(1, 0)
+        score = score.permute(1, 2, 3, 0).contiguous().view(
+            2, -1).permute(1, 0)
         score = F.softmax(score, dim=1).data[:, 1].cpu().numpy()
         return score
 
@@ -72,8 +76,8 @@ class SiamRPNTracker(SiameseTracker):
             img(np.ndarray): BGR image
             bbox: (x, y, w, h) bbox
         """
-        self.center_pos = np.array([bbox[0]+(bbox[2]-1)/2,
-                                    bbox[1]+(bbox[3]-1)/2])
+        self.center_pos = np.array([bbox[0] + (bbox[2] - 1) / 2,
+                                    bbox[1] + (bbox[3] - 1) / 2])
         self.size = np.array([bbox[2], bbox[3]])
 
         # calculate z crop size
@@ -119,12 +123,12 @@ class SiamRPNTracker(SiameseTracker):
             return np.sqrt((w + pad) * (h + pad))
 
         # scale penalty
-        s_c = change(sz(pred_bbox[2, :], pred_bbox[3, :]) /
-                     (sz(self.size[0]*scale_z, self.size[1]*scale_z)))
+        s_c = change(sz(pred_bbox[2, :], pred_bbox[3, :]) / (
+            sz(self.size[0] * scale_z, self.size[1] * scale_z)))
 
         # aspect ratio penalty
-        r_c = change((self.size[0]/self.size[1]) /
-                     (pred_bbox[2, :]/pred_bbox[3, :]))
+        r_c = change((self.size[0] / self.size[1]) / (
+            pred_bbox[2, :] / pred_bbox[3, :]))
         penalty = np.exp(-(r_c * s_c - 1) * cfg.TRACK.PENALTY_K)
         pscore = penalty * score
 
@@ -157,6 +161,6 @@ class SiamRPNTracker(SiameseTracker):
                 height]
         best_score = score[best_idx]
         return {
-                'bbox': bbox,
-                'best_score': best_score
-               }
+            'bbox': bbox,
+            'best_score': best_score
+        }
