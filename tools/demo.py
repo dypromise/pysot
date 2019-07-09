@@ -64,7 +64,7 @@ def main():
     # create model
     model = ModelBuilder()
 
-    # load model
+    # load model ### use load_pretrain
     model.load_state_dict(torch.load(args.snapshot,
                                      map_location=lambda storage,
                                      loc: storage.cpu()))

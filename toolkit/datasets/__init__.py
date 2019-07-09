@@ -6,6 +6,7 @@ from .nfs import NFSDataset
 from .trackingnet import TrackingNetDataset
 from .got10k import GOT10kDataset
 
+
 class DatasetFactory(object):
     @staticmethod
     def create_dataset(**kwargs):
@@ -39,4 +40,3 @@ class DatasetFactory(object):
         else:
             raise Exception("unknow dataset {}".format(kwargs['name']))
         return dataset
-

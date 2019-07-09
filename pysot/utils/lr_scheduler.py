@@ -117,7 +117,7 @@ class WarmUPScheduler(LRScheduler):
         warmup = warmup.lr_spaces  # [::-1]
         normal = normal.lr_spaces
         self.lr_spaces = np.concatenate([warmup, normal])
-        self.start_lr = normal[0]
+        self.start_lr = normal[0]  # this make lr begin 1/2 * initial_lr !!!
 
         super(WarmUPScheduler, self).__init__(optimizer, last_epoch)
 
