@@ -48,6 +48,7 @@ TRAIN:
     CLS_WEIGHT: 1.
     LOC_WEIGHT: 1.2
     RESUME: ''
+    NUM_WORKERS: 2
 
     LR:
         TYPE: 'log'
@@ -65,9 +66,9 @@ TRAIN:
 DATASET:
     NAMES:
     - 'VID'
-    - 'YOUTUBEBB'
-    - 'COCO'
-    - 'DET'
+    # - 'YOUTUBEBB'
+    # - 'COCO'
+    # - 'DET'
 
     TEMPLATE:
         SHIFT: 4
