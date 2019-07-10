@@ -48,7 +48,7 @@ TRAIN:
     CLS_WEIGHT: 1.
     LOC_WEIGHT: 1.2
     RESUME: ''
-    NUM_WORKERS: 2
+    NUM_WORKERS: 4
 
     LR:
         TYPE: 'log'
