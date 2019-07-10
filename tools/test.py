@@ -40,6 +40,8 @@ torch.set_num_threads(1)
 def main():
     # load config
     cfg.merge_from_file(args.config)
+    cfg.CUDA = torch.cuda.is_available()
+    device = torch.device('cuda' if cfg.CUDA else 'cpu')
 
     cur_dir = os.path.dirname(os.path.realpath(__file__))
     dataset_root = os.path.join(cur_dir, '../testing_dataset', args.dataset)
@@ -48,7 +50,7 @@ def main():
     model = ModelBuilder()
 
     # load model
-    model = load_pretrain(model, args.snapshot).cuda().eval()
+    model = load_pretrain(model, args.snapshot).eval().to(device)
 
     # build tracker
     tracker = build_tracker(model)

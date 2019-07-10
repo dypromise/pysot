@@ -15,6 +15,8 @@ from pysot.core.config import cfg
 from pysot.models.model_builder import ModelBuilder
 from pysot.tracker.tracker_builder import build_tracker
 from pysot.utils.model_load import load_pretrain
+from cv2 import VideoWriter, VideoWriter_fourcc, imread, resize
+import pdb
 
 torch.set_num_threads(1)
 
@@ -65,12 +67,8 @@ def main():
     # create model
     model = ModelBuilder()
 
-    # load model ######## please use load_pretrain
-    # model.load_state_dict(torch.load(args.snapshot,
-    #                                  map_location=lambda storage,
-    #                                  loc: storage.cpu()))
-    model = load_pretrain(model, args.snapshot)
-    model.eval().to(device)
+    # load model
+    model = load_pretrain(model, args.snapshot).cuda().eval()
 
     # build tracker
     tracker = build_tracker(model)
@@ -80,11 +78,18 @@ def main():
         video_name = args.video_name.split('/')[-1].split('.')[0]
     else:
         video_name = 'webcam'
-    cv2.namedWindow(video_name, cv2.WND_PROP_FULLSCREEN)
+    # cv2.namedWindow(video_name, cv2.WND_PROP_FULLSCREEN)
+    idx = 0
+    fps = 30
+    fourcc = VideoWriter_fourcc(*"MJPG")
+    tframe = list(get_frames(args.video_name))[0]
+    size = (tframe.shape[1], tframe.shape[0])
+    video = cv2.VideoWriter("test_demo.avi", fourcc, fps, size)
     for frame in get_frames(args.video_name):
         if first_frame:
             try:
-                init_rect = cv2.selectROI(video_name, frame, False, False)
+                # init_rect = cv2.selectROI(video_name, frame, False, False)
+                init_rect = np.array([420, 460, 227, 240])
             except:
                 exit()
             tracker.init(frame, init_rect)
@@ -103,9 +108,11 @@ def main():
                 bbox = list(map(int, outputs['bbox']))
                 cv2.rectangle(frame, (bbox[0], bbox[1]),
                               (bbox[0] + bbox[2], bbox[1] + bbox[3]),
-                              (0, 255, 0), 3)
-            cv2.imshow(video_name, frame)
-            cv2.waitKey(1)
+                              (255, 0, 0), 3)
+            # cv2.imshow(video_name, frame)
+            video.write(frame)
+            # cv2.waitKey(40)
+    video.release()
 
 
 if __name__ == '__main__':
