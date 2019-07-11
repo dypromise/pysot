@@ -15,8 +15,7 @@ from pysot.core.config import cfg
 from pysot.models.model_builder import ModelBuilder
 from pysot.tracker.tracker_builder import build_tracker
 from pysot.utils.model_load import load_pretrain
-from cv2 import VideoWriter, VideoWriter_fourcc, imread, resize
-import pdb
+from cv2 import VideoWriter_fourcc
 
 torch.set_num_threads(1)
 
@@ -25,6 +24,8 @@ parser.add_argument('--config', type=str, help='config file')
 parser.add_argument('--snapshot', type=str, help='model name')
 parser.add_argument('--video_name', default='', type=str,
                     help='videos or image files')
+parser.add_argument('--init_bbox', type=int, nargs='+',
+                    help='init bbox location for tracking')
 args = parser.parse_args()
 
 
@@ -68,28 +69,22 @@ def main():
     model = ModelBuilder()
 
     # load model
-    model = load_pretrain(model, args.snapshot).cuda().eval()
+    model = load_pretrain(model, args.snapshot).eval().to(device)
 
     # build tracker
     tracker = build_tracker(model)
-
     first_frame = True
-    if args.video_name:
-        video_name = args.video_name.split('/')[-1].split('.')[0]
-    else:
-        video_name = 'webcam'
-    # cv2.namedWindow(video_name, cv2.WND_PROP_FULLSCREEN)
-    idx = 0
-    fps = 30
+
+    # tracking
+    fps = 24
     fourcc = VideoWriter_fourcc(*"MJPG")
     tframe = list(get_frames(args.video_name))[0]
     size = (tframe.shape[1], tframe.shape[0])
-    video = cv2.VideoWriter("test_demo.avi", fourcc, fps, size)
-    for frame in get_frames(args.video_name):
+    video = cv2.VideoWriter("demo_res.avi", fourcc, fps, size)
+    for i, frame in enumerate(get_frames(args.video_name)):
         if first_frame:
             try:
-                # init_rect = cv2.selectROI(video_name, frame, False, False)
-                init_rect = np.array([420, 460, 227, 240])
+                init_rect = np.array(args.init_bbox)
             except:
                 exit()
             tracker.init(frame, init_rect)
@@ -108,9 +103,10 @@ def main():
                 bbox = list(map(int, outputs['bbox']))
                 cv2.rectangle(frame, (bbox[0], bbox[1]),
                               (bbox[0] + bbox[2], bbox[1] + bbox[3]),
-                              (255, 0, 0), 3)
+                              (0, 255, 0), 3)
             # cv2.imshow(video_name, frame)
             video.write(frame)
+            print("write frames: {}".format(i), end='\r')
             # cv2.waitKey(40)
     video.release()
 
