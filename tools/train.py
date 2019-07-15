@@ -201,7 +201,7 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
             cur_lr = lr_scheduler.get_cur_lr()
             logger.info('epoch: {}'.format(epoch + 1))
 
-        tb_idx = idx
+        tb_idx = idx + num_per_epoch * start_epoch
         if idx % num_per_epoch == 0 and idx != 0:
             for idx, pg in enumerate(optimizer.param_groups):
                 logger.info('epoch {} lr {}'.format(epoch + 1, pg['lr']))
