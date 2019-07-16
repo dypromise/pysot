@@ -101,14 +101,21 @@ def main():
                 frame = cv2.addWeighted(frame, 0.77, mask, 0.23, -1)
             else:
                 bbox = list(map(int, outputs['bbox']))
-                cv2.rectangle(frame, (bbox[0], bbox[1]),
-                              (bbox[0] + bbox[2], bbox[1] + bbox[3]),
+                x, y, w, h = bbox
+                cv2.rectangle(frame, (x, y),
+                              (x + w, y + h),
                               (0, 255, 0), 3)
+                cv2.putText(frame,
+                            '{:.3f}'.format(outputs['best_score']),
+                            (x + w // 2 - 30, y + h // 2 + 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8,
+                            (0, 255, 0), 2)
             # cv2.imshow(video_name, frame)
             video.write(frame)
             print("write frames: {}".format(i), end='\r')
             # cv2.waitKey(40)
     video.release()
+    print("\ndone.")
 
 
 if __name__ == '__main__':
