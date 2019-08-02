@@ -9,18 +9,18 @@ from pysot.models.head.mask import MaskCorr, Refine
 from pysot.models.head.rpn import UPChannelRPN, DepthwiseRPN, MultiRPN
 
 RPNS = {
-        'UPChannelRPN': UPChannelRPN,
-        'DepthwiseRPN': DepthwiseRPN,
-        'MultiRPN': MultiRPN
-       }
+    'UPChannelRPN': UPChannelRPN,
+    'DepthwiseRPN': DepthwiseRPN,
+    'MultiRPN': MultiRPN
+}
 
 MASKS = {
-         'MaskCorr': MaskCorr,
-        }
+    'MaskCorr': MaskCorr,
+}
 
 REFINE = {
-          'Refine': Refine,
-         }
+    'Refine': Refine,
+}
 
 
 def get_rpn_head(name, **kwargs):

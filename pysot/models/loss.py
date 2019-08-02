@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 
 def get_cls_loss(pred, label, select):
-    if len(select.size()) == 0:
+    if len(select) == 0:
         return 0
     pred = torch.index_select(pred, 0, select)
     label = torch.index_select(label, 0, select)

@@ -9,18 +9,20 @@ import torch.nn as nn
 
 
 class AdjustLayer(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, base_size=8, crop_size=7):
         super(AdjustLayer, self).__init__()
         self.downsample = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels),
         )
+        self.base_size = base_size
+        self.crop_size = crop_size
 
     def forward(self, x):
         x = self.downsample(x)
-        if x.size(3) < 20:
-            l = 4
-            r = l + 7
+        if x.size(3) < 15:
+            l = self.base_size // 2
+            r = l + self.crop_size
             x = x[:, :, l:r, l:r]
         return x
 
@@ -45,3 +47,56 @@ class AdjustAllLayer(nn.Module):
                 adj_layer = getattr(self, 'downsample' + str(i + 2))
                 out.append(adj_layer(features[i]))
             return out
+
+
+class AdjustLayerCEM(nn.Module):
+    def __init__(self, in_channels, out_channels, base_size=8, crop_size=7):
+        super(AdjustLayerCEM, self).__init__()
+        self.base_size = base_size
+        self.crop_size = crop_size
+        self.contextEM = ContextEnhancementModule(in_channels, out_channels)
+
+    def forward(self, xs):
+        x1, x2, x3 = xs
+        # print(x1.shape)
+        # print(x2.shape)
+        # print(x3.shape)
+        x = self.contextEM(x1, x2, x3)
+        if x.size(3) < 20:  # shufflenetv2
+            l = self.base_size // 2
+            r = l + self.crop_size
+            x = x[:, :, l:r, l:r]
+        return x
+
+
+class ContextEnhancementModule(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(ContextEnhancementModule, self).__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels[0], out_channels[0],
+                      kernel_size=1, bias=False),
+            nn.BatchNorm2d(out_channels[0]),
+            nn.ReLU(inplace=True),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels[1], out_channels[1],
+                      kernel_size=1, bias=False),
+            nn.BatchNorm2d(out_channels[1]),
+            nn.ReLU(inplace=True),
+        )
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(in_channels[2], out_channels[2],
+                      kernel_size=1, bias=False),
+            nn.BatchNorm2d(out_channels[2]),
+            nn.ReLU(inplace=True),
+        )
+        self.upsample2 = nn.Upsample(scale_factor=2, mode='bilinear')
+        self.upsample3 = nn.Upsample(scale_factor=4, mode='bilinear')
+
+    def forward(self, x1, x2, x3):
+        x1 = self.conv1(x1)
+        x2 = self.conv2(x2)
+        x2 = self.upsample2(x2)
+        x3 = self.conv3(x3)
+        x3 = self.upsample3(x3)
+        return x1 + x2 + x3

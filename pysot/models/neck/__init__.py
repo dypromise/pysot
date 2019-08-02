@@ -9,12 +9,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pysot.models.neck.neck import AdjustLayer, AdjustAllLayer
+from pysot.models.neck.neck import AdjustLayer, AdjustAllLayer, AdjustLayerCEM
 
 NECKS = {
-         'AdjustLayer': AdjustLayer,
-         'AdjustAllLayer': AdjustAllLayer
-        }
+    'AdjustLayer': AdjustLayer,
+    'AdjustLayerCEM': AdjustLayerCEM,
+    'AdjustAllLayer': AdjustAllLayer
+}
+
 
 def get_neck(name, **kwargs):
     return NECKS[name](**kwargs)

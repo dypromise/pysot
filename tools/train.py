@@ -78,18 +78,29 @@ def build_opt_lr(model, current_epoch=0):
         if isinstance(m, nn.BatchNorm2d):
             m.eval()
     if current_epoch >= cfg.BACKBONE.TRAIN_EPOCH:
-        for layer in cfg.BACKBONE.TRAIN_LAYERS:
-            for param in getattr(model.backbone, layer).parameters():
-                param.requires_grad = True
-            for m in getattr(model.backbone, layer).modules():
-                if isinstance(m, nn.BatchNorm2d):
-                    m.train()
-    # else:
-    #     for param in model.backbone.parameters():
-    #         param.requires_grad = False
-    #     for m in model.backbone.modules():
-    #         if isinstance(m, nn.BatchNorm2d):
-    #             m.eval()
+        if cfg.BACKBONE.TYPE == 'mobilenetv2_official':
+            for i in range(cfg.BACKBONE.TRAIN_BLOCKS_FROM, 14):
+                for param in model.backbone.features[i].parameters():
+                    param.requires_grad = True
+                for m in model.backbone.features[i].modules():
+                    if isinstance(m, nn.BatchNorm2d):
+                        m.train()
+        elif cfg.BACKBONE.TYPE == 'shufflenetv2_official':
+            for i in range(2, 5):
+                for param in getattr(model.backbone,
+                                     "stage{}".format(i)).parameters():
+                    param.requires_grad = True
+                for m in getattr(model.backbone,
+                                 "stage{}".format(i)).modules():
+                    if isinstance(m, nn.BatchNorm2d):
+                        m.train()
+        else:
+            for layer in cfg.BACKBONE.TRAIN_LAYERS:
+                for param in getattr(model.backbone, layer).parameters():
+                    param.requires_grad = True
+                for m in getattr(model.backbone, layer).modules():
+                    if isinstance(m, nn.BatchNorm2d):
+                        m.train()
 
     trainable_params = []
     trainable_params += [{'params': filter(lambda x: x.requires_grad,
@@ -193,7 +204,7 @@ def train(train_loader, model, optimizer, lr_scheduler, tb_writer):
                 return
 
             if cfg.BACKBONE.TRAIN_EPOCH == epoch:
-                logger.info('start training backbone.')
+                logger.info('********** start training backbone **********')
                 optimizer, lr_scheduler = build_opt_lr(model.module, epoch)
                 logger.info("model\n{}".format(describe(model.module)))
 
@@ -278,7 +289,9 @@ def main():
         logger.info("config \n{}".format(json.dumps(cfg, indent=4)))
 
     # create model
-    model = ModelBuilder().cuda().train()
+    model = ModelBuilder()
+    # print(model)
+    model = model.cuda().train()
     dist_model = DistModule(model)
 
     # load pretrained backbone weights
@@ -307,6 +320,7 @@ def main():
             '{} is not a valid file.'.format(cfg.TRAIN.RESUME)
         model, optimizer, cfg.TRAIN.START_EPOCH = \
             restore_from(model, optimizer, cfg.TRAIN.RESUME)
+
     # load pretrain
     elif cfg.TRAIN.PRETRAINED:
         load_pretrain(model, cfg.TRAIN.PRETRAINED)

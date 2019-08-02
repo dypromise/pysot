@@ -85,11 +85,73 @@ class DepthwiseXCorr(nn.Module):
         return out
 
 
+class DWConvDWXCorr(nn.Module):
+    def __init__(self, in_channels, hidden, out_channels, kernel_size=3,
+                 hidden_kernel_size=5):
+        super(DWConvDWXCorr, self).__init__()
+        self.conv_kernel = nn.Sequential(
+            # dw
+            nn.Conv2d(in_channels, in_channels,
+                      kernel_size=kernel_size,
+                      groups=in_channels, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            # pw
+            nn.Conv2d(in_channels, hidden, 1, 1, 0, bias=False),
+            nn.BatchNorm2d(hidden),
+            nn.ReLU(inplace=True),
+        )
+        self.conv_search = nn.Sequential(
+            # dw
+            nn.Conv2d(in_channels, in_channels,
+                      kernel_size=kernel_size,
+                      groups=in_channels, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            # pw
+            nn.Conv2d(in_channels, hidden, 1, 1, 0, bias=False),
+            nn.BatchNorm2d(hidden),
+            nn.ReLU(inplace=True),
+        )
+        self.head = nn.Sequential(
+            nn.Conv2d(hidden, hidden, kernel_size=1, bias=False),
+            nn.BatchNorm2d(hidden),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(hidden, out_channels, kernel_size=1)
+        )
+
+    def forward(self, kernel, search):
+        kernel = self.conv_kernel(kernel)
+        search = self.conv_search(search)
+        feature = xcorr_depthwise(search, kernel)
+        out = self.head(feature)
+        return out
+
+
+class DWConvDWXCorr_slim(nn.Module):
+    def __init__(self, in_channels, hidden, out_channels, kernel_size=3,
+                 hidden_kernel_size=5):
+        """ Default input channels is same as hidden. """
+        super(DWConvDWXCorr, self).__init__()
+        self.head = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=hidden_kernel_size,
+                      groups=in_channels, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        )
+
+    def forward(self, kernel, search):
+        feature = xcorr_depthwise(search, kernel)
+        out = self.head(feature)
+        return out
+
+
 class DepthwiseRPN(RPN):
     def __init__(self, anchor_num=5, in_channels=256, out_channels=256):
         super(DepthwiseRPN, self).__init__()
-        self.cls = DepthwiseXCorr(in_channels, out_channels, 2 * anchor_num)
-        self.loc = DepthwiseXCorr(in_channels, out_channels, 4 * anchor_num)
+        self.cls = DWConvDWXCorr(in_channels, out_channels, 2 * anchor_num)
+        self.loc = DWConvDWXCorr(in_channels, out_channels, 4 * anchor_num)
 
     def forward(self, z_f, x_f):
         cls = self.cls(z_f, x_f)

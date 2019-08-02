@@ -177,6 +177,7 @@ __C.BACKBONE.PRETRAINED = ''
 
 # Train layers
 __C.BACKBONE.TRAIN_LAYERS = ['layer2', 'layer3', 'layer4']
+__C.BACKBONE.TRAIN_BLOCKS_FROM = 0
 
 # Layer LR
 __C.BACKBONE.LAYERS_LR = 0.1
