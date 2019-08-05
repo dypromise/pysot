@@ -13,6 +13,22 @@ from pysot.core.xcorr import xcorr_fast, xcorr_depthwise
 from pysot.models.init_weight import init_weights
 
 
+def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1,
+                    padding=0, onnx_compatible=False):
+    """Replace Conv2d with a depthwise Conv2d and Pointwise Conv2d.
+    """
+    ReLU = nn.ReLU if onnx_compatible else nn.ReLU6
+    return nn.Sequential(
+        nn.Conv2d(in_channels=in_channels, out_channels=in_channels,
+                  kernel_size=kernel_size, groups=in_channels,
+                  stride=stride, padding=padding),
+        nn.BatchNorm2d(in_channels),
+        ReLU(inplace=True),
+        nn.Conv2d(in_channels=in_channels,
+                  out_channels=out_channels, kernel_size=1),
+    )
+
+
 class RPN(nn.Module):
     def __init__(self):
         super(RPN, self).__init__()
@@ -128,23 +144,18 @@ class DWConvDWXCorr(nn.Module):
         return out
 
 
-class DWConvDWXCorr_slim(nn.Module):
-    def __init__(self, in_channels, hidden, out_channels, kernel_size=3,
-                 hidden_kernel_size=5):
-        """ Default input channels is same as hidden. """
-        super(DWConvDWXCorr, self).__init__()
-        self.head = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, kernel_size=hidden_kernel_size,
-                      groups=in_channels, bias=False),
-            nn.BatchNorm2d(in_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels, out_channels, kernel_size=1)
-        )
+# class DWConvDWXCorr_slim(nn.Module):
+#     def __init__(self, in_channels, hidden, out_channels, kernel_size=3,
+#                  hidden_kernel_size=5):
+#         """ Default input channels is same as hidden. """
+#         super(DWConvDWXCorr_slim, self).__init__()
+#         self.head = SeperableConv2d(
+#             in_channels, out_channels, kernel_size=3, padding=1)
 
-    def forward(self, kernel, search):
-        feature = xcorr_depthwise(search, kernel)
-        out = self.head(feature)
-        return out
+#     def forward(self, kernel, search):
+#         feature = xcorr_depthwise(search.contiguous(), kernel.contiguous())
+#         out = self.head(feature)
+#         return out
 
 
 class DepthwiseRPN(RPN):
@@ -156,6 +167,22 @@ class DepthwiseRPN(RPN):
     def forward(self, z_f, x_f):
         cls = self.cls(z_f, x_f)
         loc = self.loc(z_f, x_f)
+        return cls, loc
+
+
+class DepthwiseRPNSingleHead(RPN):
+    def __init__(self, anchor_num=5, in_channels=256, out_channels=256):
+        super(DepthwiseRPNSingleHead, self).__init__()
+        self.cls = SeperableConv2d(
+            in_channels, 2 * anchor_num, kernel_size=3, padding=1)
+        self.loc = SeperableConv2d(
+            in_channels, 4 * anchor_num, kernel_size=3, padding=1)
+
+    def forward(self, z_f, x_f):
+        assert x_f.size()[1] == z_f.size()[1], "channel don't match: z_f, x_f"
+        features = xcorr_depthwise(x_f.contiguous(), z_f.contiguous())
+        cls = self.cls(features)
+        loc = self.loc(features)
         return cls, loc
 
 

@@ -57,11 +57,11 @@ class AdjustLayerCEM(nn.Module):
         self.contextEM = ContextEnhancementModule(in_channels, out_channels)
 
     def forward(self, xs):
-        x1, x2, x3 = xs
+        x2, x3 = xs
         # print(x1.shape)
         # print(x2.shape)
         # print(x3.shape)
-        x = self.contextEM(x1, x2, x3)
+        x = self.contextEM(x2, x3)
         if x.size(3) < 20:  # shufflenetv2
             l = self.base_size // 2
             r = l + self.crop_size
@@ -72,31 +72,31 @@ class AdjustLayerCEM(nn.Module):
 class ContextEnhancementModule(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(ContextEnhancementModule, self).__init__()
-        self.conv1 = nn.Sequential(
+        # self.conv1 = nn.Sequential(
+        #     nn.Conv2d(in_channels[0], out_channels[0],
+        #               kernel_size=1, bias=False),
+        #     nn.BatchNorm2d(out_channels[0]),
+        #     nn.ReLU(inplace=True),
+        # )
+        self.conv2 = nn.Sequential(
             nn.Conv2d(in_channels[0], out_channels[0],
                       kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels[0]),
             nn.ReLU(inplace=True),
         )
-        self.conv2 = nn.Sequential(
+        self.conv3 = nn.Sequential(
             nn.Conv2d(in_channels[1], out_channels[1],
                       kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels[1]),
             nn.ReLU(inplace=True),
         )
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels[2], out_channels[2],
-                      kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels[2]),
-            nn.ReLU(inplace=True),
-        )
         self.upsample2 = nn.Upsample(scale_factor=2, mode='bilinear')
         self.upsample3 = nn.Upsample(scale_factor=4, mode='bilinear')
 
-    def forward(self, x1, x2, x3):
-        x1 = self.conv1(x1)
+    def forward(self, x2, x3):
+        # x1 = self.conv1(x1)
         x2 = self.conv2(x2)
         x2 = self.upsample2(x2)
         x3 = self.conv3(x3)
         x3 = self.upsample3(x3)
-        return x1 + x2 + x3
+        return x2 + x3

@@ -119,7 +119,7 @@ class ShuffleNetV2(nn.Module):
         x2 = self.stage2(x)
         x3 = self.stage3(x2)
         x4 = self.stage4(x3)
-        return [x2, x3, x4]
+        return [x3, x4]
 
 
 def _shufflenetv2(arch, pretrained, progress, *args, **kwargs):
