@@ -90,13 +90,13 @@ class ContextEnhancementModule(nn.Module):
             nn.BatchNorm2d(out_channels[1]),
             nn.ReLU(inplace=True),
         )
-        self.upsample2 = nn.Upsample(scale_factor=2, mode='bilinear')
-        self.upsample3 = nn.Upsample(scale_factor=4, mode='bilinear')
+        # self.upsample2 = nn.Upsample(scale_factor=2, mode='bilinear')
+        # self.upsample3 = nn.Upsample(scale_factor=4, mode='bilinear')
 
     def forward(self, x2, x3):
         # x1 = self.conv1(x1)
         x2 = self.conv2(x2)
-        x2 = self.upsample2(x2)
+        x2 = nn.functional.interpolate(x2, scale_factor=2)
         x3 = self.conv3(x3)
-        x3 = self.upsample3(x3)
+        x3 = nn.functional.interpolate(x3, scale_factor=4)
         return x2 + x3
