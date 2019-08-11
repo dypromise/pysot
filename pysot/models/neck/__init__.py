@@ -5,16 +5,15 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
-from pysot.models.neck.neck import AdjustLayer, AdjustAllLayer, AdjustLayerCEM
+from pysot.models.neck.neck import AdjustLayer, AdjustAllLayer, \
+    AdjustLayerCEM, UpsampleAllLayer
 
 NECKS = {
     'AdjustLayer': AdjustLayer,
     'AdjustLayerCEM': AdjustLayerCEM,
-    'AdjustAllLayer': AdjustAllLayer
+    'AdjustAllLayer': AdjustAllLayer,
+    'UpsampleAllLayer': UpsampleAllLayer
 }
 
 

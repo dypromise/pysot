@@ -171,7 +171,7 @@ class DepthwiseRPN(RPN):
 
 
 class DepthwiseRPNSingleHead(RPN):
-    def __init__(self, anchor_num=5, in_channels=256, out_channels=256):
+    def __init__(self, anchor_num=5, in_channels=256):
         super(DepthwiseRPNSingleHead, self).__init__()
         self.cls = SeperableConv2d(
             in_channels, 2 * anchor_num, kernel_size=3, padding=1)
@@ -191,9 +191,9 @@ class MultiRPN(RPN):
         super(MultiRPN, self).__init__()
         self.weighted = weighted
         for i in range(len(in_channels)):
-            self.add_module('rpn' + str(i + 2),
-                            DepthwiseRPN(anchor_num, in_channels[i],
-                                         in_channels[i]))
+            self.add_module(
+                'rpn' + str(i + 2),
+                DepthwiseRPNSingleHead(anchor_num, in_channels[i]))
         if self.weighted:
             self.cls_weight = nn.Parameter(torch.ones(len(in_channels)))
             self.loc_weight = nn.Parameter(torch.ones(len(in_channels)))

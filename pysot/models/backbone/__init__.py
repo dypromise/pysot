@@ -9,6 +9,8 @@ from pysot.models.backbone.alexnet import alexnetlegacy, alexnet
 from pysot.models.backbone.mobile_v2 import mobilenetv2
 from pysot.models.backbone.mobile_v2_official import mobilenetv2official
 from pysot.models.backbone.shufflenet_v2_official import shufflenetv2official
+from pysot.models.backbone.shufflenetv2_M import shufflenet_v2_x1_0_M as \
+    shufflenetv2_M
 from pysot.models.backbone.resnet_atrous import resnet18, resnet34, resnet50
 
 BACKBONES = {
@@ -16,6 +18,7 @@ BACKBONES = {
     'mobilenetv2': mobilenetv2,
     'mobilenetv2_official': mobilenetv2official,
     'shufflenetv2_official': shufflenetv2official,
+    'shufflenetv2_M': shufflenetv2_M,
     'resnet18': resnet18,
     'resnet34': resnet34,
     'resnet50': resnet50,

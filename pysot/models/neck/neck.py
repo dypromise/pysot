@@ -8,6 +8,22 @@ from __future__ import unicode_literals
 import torch.nn as nn
 
 
+def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1,
+                    padding=0, onnx_compatible=False):
+    """Replace Conv2d with a depthwise Conv2d and Pointwise Conv2d.
+    """
+    ReLU = nn.ReLU if onnx_compatible else nn.ReLU6
+    return nn.Sequential(
+        nn.Conv2d(in_channels=in_channels, out_channels=in_channels,
+                  kernel_size=kernel_size, groups=in_channels,
+                  stride=stride, padding=padding),
+        nn.BatchNorm2d(in_channels),
+        ReLU(inplace=True),
+        nn.Conv2d(in_channels=in_channels,
+                  out_channels=out_channels, kernel_size=1),
+    )
+
+
 class AdjustLayer(nn.Module):
     def __init__(self, in_channels, out_channels, base_size=8, crop_size=7):
         super(AdjustLayer, self).__init__()
@@ -50,18 +66,18 @@ class AdjustAllLayer(nn.Module):
 
 
 class AdjustLayerCEM(nn.Module):
-    def __init__(self, in_channels, out_channels, base_size=8, crop_size=7):
+    def __init__(self, in_channels, out_channels, scale_factors,
+                 base_size=8, crop_size=7):
         super(AdjustLayerCEM, self).__init__()
+        self.num = len(in_channels)
         self.base_size = base_size
         self.crop_size = crop_size
-        self.contextEM = ContextEnhancementModule(in_channels, out_channels)
+        self.contextEM = ContextEnhancementModule(
+            in_channels, out_channels, scale_factors)
 
     def forward(self, xs):
-        x2, x3 = xs
-        # print(x1.shape)
-        # print(x2.shape)
-        # print(x3.shape)
-        x = self.contextEM(x2, x3)
+        xs_ = xs[-self.num:]
+        x = self.contextEM(xs_)
         if x.size(3) < 20:  # shufflenetv2
             l = self.base_size // 2
             r = l + self.crop_size
@@ -70,33 +86,78 @@ class AdjustLayerCEM(nn.Module):
 
 
 class ContextEnhancementModule(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, scale_factors):
         super(ContextEnhancementModule, self).__init__()
-        # self.conv1 = nn.Sequential(
-        #     nn.Conv2d(in_channels[0], out_channels[0],
-        #               kernel_size=1, bias=False),
-        #     nn.BatchNorm2d(out_channels[0]),
-        #     nn.ReLU(inplace=True),
-        # )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(in_channels[0], out_channels[0],
-                      kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels[0]),
-            nn.ReLU(inplace=True),
-        )
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels[1], out_channels[1],
-                      kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels[1]),
-            nn.ReLU(inplace=True),
-        )
-        # self.upsample2 = nn.Upsample(scale_factor=2, mode='bilinear')
-        # self.upsample3 = nn.Upsample(scale_factor=4, mode='bilinear')
+        self.num = len(in_channels)
+        for i in range(self.num):
+            self.add_module(
+                'conv' + str(i + 2),
+                nn.Sequential(
+                    nn.Conv2d(in_channels[i], out_channels[i],
+                              kernel_size=1, bias=False),
+                    nn.BatchNorm2d(out_channels[0])
+                )
+            )
+        self.scale_factors = scale_factors
 
-    def forward(self, x2, x3):
-        # x1 = self.conv1(x1)
-        x2 = self.conv2(x2)
-        x2 = nn.functional.interpolate(x2, scale_factor=2)
-        x3 = self.conv3(x3)
-        x3 = nn.functional.interpolate(x3, scale_factor=4)
-        return x2 + x3
+    def forward(self, xs):
+        out = []
+        for i in range(self.num):
+            adj_layer = getattr(self, 'conv' + str(i + 2))
+            x = adj_layer(xs[i])
+            x = nn.functional.interpolate(
+                x, scale_factor=self.scale_factors[i])
+            out.append(x)
+        return sum(out)
+
+
+class AdjustUpsampleLayer(nn.Module):
+    def __init__(self, in_channel, out_channel, adjust=True, scale_factor=2,
+                 base_size=8, crop_size=8):
+        super(AdjustUpsampleLayer, self).__init__()
+        self.adjust = adjust
+        if self.adjust:
+            self.conv = SeperableConv2d(
+                in_channel, out_channel, kernel_size=3, padding=1)
+        self.base_size = base_size
+        self.crop_size = crop_size
+        self.scale_factor = scale_factor
+
+    def forward(self, x):
+        if self.adjust:
+            x = self.conv(x)
+        x = nn.functional.interpolate(x, scale_factor=self.scale_factor)
+        if x.size(3) < 20:
+            l = self.base_size // 2
+            r = l + self.crop_size
+            x = x[:, :, l:r, l:r]
+        return x
+
+
+class UpsampleAllLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, adjusts, scale_factors,
+                 base_size, crop_size):
+        super(UpsampleAllLayer, self).__init__()
+        self.num = len(in_channels)
+        if self.num == 1:
+            self.upsample = AdjustUpsampleLayer(
+                in_channels[0], out_channels[0], adjusts[0], scale_factors[0],
+                base_size, crop_size)
+        else:
+            for i in range(self.num):
+                self.add_module(
+                    'upsample' + str(i + 2),
+                    AdjustUpsampleLayer(
+                        in_channels[i], out_channels[i], adjusts[i],
+                        scale_factors[i], base_size, crop_size))
+
+    def forward(self, features):
+        features = features[-self.num:]
+        if self.num == 1:
+            return self.upsample(features)
+        else:
+            out = []
+            for i in range(self.num):
+                adj_layer = getattr(self, 'upsample' + str(i + 2))
+                out.append(adj_layer(features[i]))
+            return out
