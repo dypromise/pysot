@@ -122,7 +122,7 @@ class ShuffleNetV2(nn.Module):
         x3 = x2
         for i in range(2, 8):
             x3 = self.stage3[i](x3)
-        # x3 = self.stage4(x2)
+        # x4 = self.stage4(x3)
         # x = self.conv5(x)
         # x = x.mean([2, 3])  # globalpool
         # x = self.fc(x)

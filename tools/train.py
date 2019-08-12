@@ -94,6 +94,15 @@ def build_opt_lr(model, current_epoch=0):
                                  "stage{}".format(i)).modules():
                     if isinstance(m, nn.BatchNorm2d):
                         m.train()
+        elif cfg.BACKBONE.TYPE == 'shufflenetv2_M':
+            for i in range(2, 4):
+                for param in getattr(model.backbone,
+                                     "stage{}".format(i)).parameters():
+                    param.requires_grad = True
+                for m in getattr(model.backbone,
+                                 "stage{}".format(i)).modules():
+                    if isinstance(m, nn.BatchNorm2d):
+                        m.train()
         else:
             for layer in cfg.BACKBONE.TRAIN_LAYERS:
                 for param in getattr(model.backbone, layer).parameters():
