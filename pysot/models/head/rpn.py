@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from pysot.core.xcorr import xcorr_fast, xcorr_depthwise
-from ..neck import SeperableConv2d
+from pysot.models.neck.neck import SeperableConv2d
 # from pysot.models.init_weight import init_weights
 
 
