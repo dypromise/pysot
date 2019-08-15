@@ -95,7 +95,8 @@ class ContextEnhancementModule(nn.Module):
                 nn.Sequential(
                     nn.Conv2d(in_channels[i], out_channels[i],
                               kernel_size=1, bias=False),
-                    nn.BatchNorm2d(out_channels[0])
+                    nn.BatchNorm2d(out_channels[0]),
+                    nn.ReLU(inplace=True)
                 )
             )
         self.scale_factors = scale_factors
@@ -106,7 +107,7 @@ class ContextEnhancementModule(nn.Module):
             adj_layer = getattr(self, 'conv' + str(i + 2))
             x = adj_layer(xs[i])
             x = nn.functional.interpolate(
-                x, scale_factor=self.scale_factors[i])
+                x, scale_factor=self.scale_factors[i], mode='bilinear')
             out.append(x)
         return sum(out)
 
@@ -126,7 +127,8 @@ class AdjustUpsampleLayer(nn.Module):
     def forward(self, x):
         if self.adjust:
             x = self.conv(x)
-        x = nn.functional.interpolate(x, scale_factor=self.scale_factor)
+        x = nn.functional.interpolate(
+            x, scale_factor=self.scale_factor, mode='bilinear')
         if x.size(3) < 20:
             l = self.base_size // 2
             r = l + self.crop_size

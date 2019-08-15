@@ -67,7 +67,7 @@ class SiamRPNLTTracker(SiamRPNTracker):
         # window
         if not self.longterm_state:
             pscore = pscore * (1 - cfg.TRACK.WINDOW_INFLUENCE) + \
-                    window * cfg.TRACK.WINDOW_INFLUENCE
+                window * cfg.TRACK.WINDOW_INFLUENCE
         else:
             pscore = pscore * (1 - 0.001) + window * 0.001
         best_idx = np.argmax(pscore)
@@ -105,6 +105,6 @@ class SiamRPNLTTracker(SiamRPNTracker):
             self.longterm_state = False
 
         return {
-                'bbox': bbox,
-                'best_score': best_score
-               }
+            'bbox': bbox,
+            'best_score': best_score
+        }
