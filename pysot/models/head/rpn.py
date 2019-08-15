@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from pysot.core.xcorr import xcorr_fast, xcorr_depthwise
+from ..neck import SeperableConv2d
 # from pysot.models.init_weight import init_weights
 
 
@@ -143,20 +144,10 @@ class DepthwiseRPN(RPN):
 class DepthwiseRPNSingleHead(RPN):
     def __init__(self, anchor_num=5, in_channels=256):
         super(DepthwiseRPNSingleHead, self).__init__()
-        self.cls = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1,
-                      groups=in_channels, bias=False),
-            nn.BatchNorm2d(in_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels, 2 * anchor_num, kernel_size=1)
-        )
-        self.loc = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1,
-                      groups=in_channels, bias=False),
-            nn.BatchNorm2d(in_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels, 4 * anchor_num, kernel_size=1)
-        )
+        self.cls = SeperableConv2d(in_channels, 2 * anchor_num, kernel_size=3,
+                                   stride=1, padding=1, bias=False)
+        self.loc = SeperableConv2d(in_channels, 4 * anchor_num, kernel_size=3,
+                                   stride=1, padding=1, bias=False)
 
     def forward(self, z_f, x_f):
         features = xcorr_depthwise(x_f.contiguous(), z_f.contiguous())

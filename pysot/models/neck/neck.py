@@ -9,16 +9,15 @@ import torch.nn as nn
 
 
 def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1,
-                    padding=0, onnx_compatible=False):
+                    padding=0, bias=False):
     """Replace Conv2d with a depthwise Conv2d and Pointwise Conv2d.
     """
-    ReLU = nn.ReLU if onnx_compatible else nn.ReLU6
     return nn.Sequential(
         nn.Conv2d(in_channels=in_channels, out_channels=in_channels,
                   kernel_size=kernel_size, groups=in_channels,
-                  stride=stride, padding=padding),
+                  stride=stride, padding=padding, bias=bias),
         nn.BatchNorm2d(in_channels),
-        ReLU(inplace=True),
+        nn.ReLU(inplace=True),
         nn.Conv2d(in_channels=in_channels,
                   out_channels=out_channels, kernel_size=1),
     )
@@ -95,7 +94,7 @@ class ContextEnhancementModule(nn.Module):
                 nn.Sequential(
                     nn.Conv2d(in_channels[i], out_channels[i],
                               kernel_size=1, bias=False),
-                    nn.BatchNorm2d(out_channels[0]),
+                    nn.BatchNorm2d(out_channels[i]),
                     nn.ReLU(inplace=True)
                 )
             )
