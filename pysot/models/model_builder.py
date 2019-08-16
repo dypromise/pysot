@@ -13,6 +13,7 @@ from pysot.models.loss import select_cross_entropy_loss, weight_l1_loss
 from pysot.models.backbone import get_backbone
 from pysot.models.head import get_rpn_head, get_mask_head, get_refine_head
 from pysot.models.neck import get_neck
+import time
 
 
 class ModelBuilder(nn.Module):
@@ -45,17 +46,26 @@ class ModelBuilder(nn.Module):
         if cfg.MASK.MASK:
             zf = zf[-1]
         if cfg.ADJUST.ADJUST:
-            zf = self.neck(zf)
+            zf = self.neck(zf, crop=True)  # siamrppn++
         self.zf = zf
 
     def track(self, x):
+        # start = time.time()
         xf = self.backbone(x)
+        # end1 = time.time()
+        # print("backbone: ", end1 - start)
         if cfg.MASK.MASK:
             self.xf = xf[:-1]
             xf = xf[-1]
         if cfg.ADJUST.ADJUST:
-            xf = self.neck(xf)
+            xf = self.neck(xf, crop=False)
+            # end2 = time.time()
+            # print("neck: ", end2 - end1)
+
         cls, loc = self.rpn_head(self.zf, xf)
+        # end3 = time.time()
+        # print("rpn: ", end3 - end2)
+
         if cfg.MASK.MASK:
             mask, self.mask_corr_feature = self.mask_head(self.zf, xf)
         return {
@@ -91,8 +101,9 @@ class ModelBuilder(nn.Module):
             self.xf_refine = xf[:-1]
             xf = xf[-1]
         if cfg.ADJUST.ADJUST:
-            zf = self.neck(zf)
-            xf = self.neck(xf)
+            zf = self.neck(zf, crop=True)
+            xf = self.neck(xf, crop=False)
+
         cls, loc = self.rpn_head(zf, xf)
 
         # get loss

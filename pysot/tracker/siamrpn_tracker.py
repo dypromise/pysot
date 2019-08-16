@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import time
 import numpy as np
 import torch.nn.functional as F
 
@@ -110,7 +111,9 @@ class SiamRPNTracker(SiameseTracker):
                                     cfg.TRACK.INSTANCE_SIZE,
                                     round(s_x), self.channel_average)
 
+        start = time.time()
         outputs = self.model.track(x_crop)
+        print("forward: ", time.time() - start)
 
         score = self._convert_score(outputs['cls'])
         pred_bbox = self._convert_bbox(outputs['loc'], self.anchors)

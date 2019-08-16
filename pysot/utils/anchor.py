@@ -51,7 +51,7 @@ class Anchors:
     def generate_all_anchors(self, im_c, size):
         """
         im_c: image center
-        size: image size
+        size: score size
         """
         if self.image_center == im_c and self.size == size:
             return False

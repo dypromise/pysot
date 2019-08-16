@@ -111,9 +111,10 @@ def main():
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                             (0, 255, 0), 2)
             # cv2.imshow(video_name, frame)
+            # cv2.waitKey(1)
             video.write(frame)
             print("write frames: {}".format(i), end='\r')
-            # cv2.waitKey(40)
+
     video.release()
     print("\ndone.")
 

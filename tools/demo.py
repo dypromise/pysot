@@ -10,11 +10,12 @@ import cv2
 import torch
 import numpy as np
 from glob import glob
+import time
 
 from pysot.core.config import cfg
 from pysot.models.model_builder import ModelBuilder
 from pysot.tracker.tracker_builder import build_tracker
-from pysot.utils.model_load import load_pretrain
+from pysot.utils.model_load import load_pretrain, load_pretrain_cpu
 
 torch.set_num_threads(1)
 
@@ -65,12 +66,8 @@ def main():
     # create model
     model = ModelBuilder()
 
-    # load model ######## please use load_pretrain
-    # model.load_state_dict(torch.load(args.snapshot,
-    #                                  map_location=lambda storage,
-    #                                  loc: storage.cpu()))
-    model = load_pretrain(model, args.snapshot)
-    model.eval().to(device)
+    # load model
+    model = load_pretrain_cpu(model, args.snapshot).eval().to(device)
 
     # build tracker
     tracker = build_tracker(model)
@@ -81,6 +78,8 @@ def main():
     else:
         video_name = 'webcam'
     cv2.namedWindow(video_name, cv2.WND_PROP_FULLSCREEN)
+    cv2.resizeWindow(video_name, 640, 480)
+
     for frame in get_frames(args.video_name):
         if first_frame:
             try:
@@ -90,7 +89,12 @@ def main():
             tracker.init(frame, init_rect)
             first_frame = False
         else:
+
+            start = time.time()
             outputs = tracker.track(frame)
+            end = time.time()
+            print(end - start)
+
             if 'polygon' in outputs:
                 polygon = np.array(outputs['polygon']).astype(np.int32)
                 cv2.polylines(frame, [polygon.reshape((-1, 1, 2))],
@@ -101,11 +105,19 @@ def main():
                 frame = cv2.addWeighted(frame, 0.77, mask, 0.23, -1)
             else:
                 bbox = list(map(int, outputs['bbox']))
-                cv2.rectangle(frame, (bbox[0], bbox[1]),
-                              (bbox[0] + bbox[2], bbox[1] + bbox[3]),
+                x, y, w, h = bbox
+                cv2.rectangle(frame, (x, y),
+                              (x + w, y + h),
                               (0, 255, 0), 3)
+                cv2.putText(frame,
+                            '{:.3f}'.format(outputs['best_score']),
+                            (x + w // 2 - 30, y + h // 2 + 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8,
+                            (0, 255, 0), 2)
             cv2.imshow(video_name, frame)
             cv2.waitKey(1)
+            # video.write(frame)
+            # print("write frames: {}".format(i), end='\r')
 
 
 if __name__ == '__main__':

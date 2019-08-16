@@ -73,6 +73,32 @@ def load_pretrain(model, pretrained_path):
     return model
 
 
+def load_pretrain_cpu(model, pretrained_path):
+    logger.info('load pretrained model from {}'.format(pretrained_path))
+    pretrained_dict = torch.load(
+        pretrained_path,
+        map_location=lambda storage, loc: storage.cpu())
+    if "state_dict" in pretrained_dict.keys():
+        pretrained_dict = remove_prefix(pretrained_dict['state_dict'],
+                                        'module.')
+    else:
+        pretrained_dict = remove_prefix(pretrained_dict, 'module.')
+
+    try:
+        check_keys(model, pretrained_dict)
+    except:
+        logger.info('[Warning]: using pretrain as features.\
+                Adding "features." as prefix')
+        new_dict = {}
+        for k, v in pretrained_dict.items():
+            k = 'features.' + k
+            new_dict[k] = v
+        pretrained_dict = new_dict
+        check_keys(model, pretrained_dict)
+    model.load_state_dict(pretrained_dict, strict=False)
+    return model
+
+
 def restore_from(model, optimizer, ckpt_path):
     device = torch.cuda.current_device()
     ckpt = torch.load(ckpt_path,

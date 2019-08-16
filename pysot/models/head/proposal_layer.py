@@ -1,14 +1,4 @@
 from __future__ import absolute_import
-# --------------------------------------------------------
-# Faster R-CNN
-# Copyright (c) 2015 Microsoft
-# Licensed under The MIT License [see LICENSE for details]
-# Written by Ross Girshick and Sean Bell
-# --------------------------------------------------------
-# --------------------------------------------------------
-# Reorganized and modified by Jianwei Yang and Jiasen Lu
-# --------------------------------------------------------
-import numpy as np
 
 import torch
 import torch.nn as nn
@@ -32,34 +22,19 @@ class _ProposalLayer(nn.Module):
         super(_ProposalLayer, self).__init__()
         self._feat_size = cfg.TRAIN.OUTPUT_SIZE
         self._feat_stride = cfg.ANCHOR.STRIDE
+        self._anchor_generator = Anchors(cfg.ANCHOR.STRIDE,
+                                         cfg.ANCHOR.RATIOS,
+                                         cfg.ANCHOR.SCALES)
         self._anchors = torch.from_numpy(
-            self._generate_anchor(self._feat_size)).float()
+            self._anchor_generator.generate_all_anchors(
+                im_c=cfg.TRAIN.SEARCH_SIZE // 2,
+                size=cfg.TRAIN.OUTPUT_SIZE
+            )[1]).float()  # centor anchors
         self._num_anchors = len(cfg.ANCHOR.RATIOS) * len(cfg.ANCHOR.SCALES)
         self._im_size = cfg.TRAIN.SEARCH_SIZE
         self._pre_nms_topN = 200
         self._post_nms_topN = 30
         self._nms_thresh = 0.7
-
-    def _generate_anchor(self, score_size):
-        anchors = Anchors(cfg.ANCHOR.STRIDE,
-                          cfg.ANCHOR.RATIOS,
-                          cfg.ANCHOR.SCALES)
-        anchor = anchors.anchors
-        x1, y1, x2, y2 = anchor[:, 0], anchor[:, 1], anchor[:, 2], anchor[:, 3]
-        anchor = np.stack([(x1 + x2) * 0.5, (y1 + y2) * 0.5,
-                           x2 - x1, y2 - y1], 1)
-        total_stride = anchors.stride
-        anchor_num = anchor.shape[0]
-        anchor = np.tile(anchor, score_size * score_size).reshape((-1, 4))
-        ori = - (score_size // 2) * total_stride
-        xx, yy = np.meshgrid(
-            [ori + total_stride * dx for dx in range(score_size)],
-            [ori + total_stride * dy for dy in range(score_size)])
-        xx, yy = np.tile(xx.flatten(), (anchor_num, 1)).flatten(), \
-            np.tile(yy.flatten(), (anchor_num, 1)).flatten()
-        anchor[:, 0], anchor[:, 1] = xx.astype(
-            np.float32), yy.astype(np.float32)
-        return anchor  # A*K,4
 
     def _log_softmax(self, cls):
         b, a2, h, w = cls.size()

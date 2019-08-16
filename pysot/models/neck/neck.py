@@ -9,17 +9,19 @@ import torch.nn as nn
 
 
 def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1,
-                    padding=0, bias=False):
+                    padding=0, onnx_compatible=True):
     """Replace Conv2d with a depthwise Conv2d and Pointwise Conv2d.
     """
+    ReLU = nn.ReLU if onnx_compatible else nn.ReLU6
     return nn.Sequential(
         nn.Conv2d(in_channels=in_channels, out_channels=in_channels,
                   kernel_size=kernel_size, groups=in_channels,
-                  stride=stride, padding=padding, bias=bias),
+                  stride=stride, padding=padding),
         nn.BatchNorm2d(in_channels),
-        nn.ReLU(inplace=True),
+        ReLU(inplace=True),
         nn.Conv2d(in_channels=in_channels,
-                  out_channels=out_channels, kernel_size=1),
+                  out_channels=out_channels,
+                  kernel_size=1),
     )
 
 
@@ -33,9 +35,9 @@ class AdjustLayer(nn.Module):
         self.base_size = base_size
         self.crop_size = crop_size
 
-    def forward(self, x):
+    def forward(self, x, crop=False):
         x = self.downsample(x)
-        if x.size(3) < 15:
+        if crop:
             l = self.base_size // 2
             r = l + self.crop_size
             x = x[:, :, l:r, l:r]
@@ -53,14 +55,14 @@ class AdjustAllLayer(nn.Module):
                 self.add_module('downsample' + str(i + 2),
                                 AdjustLayer(in_channels[i], out_channels[i]))
 
-    def forward(self, features):
+    def forward(self, features, crop):
         if self.num == 1:
-            return self.downsample(features)
+            return self.downsample(features, crop)
         else:
             out = []
             for i in range(self.num):
                 adj_layer = getattr(self, 'downsample' + str(i + 2))
-                out.append(adj_layer(features[i]))
+                out.append(adj_layer(features[i], crop))
             return out
 
 
@@ -74,10 +76,10 @@ class AdjustLayerCEM(nn.Module):
         self.contextEM = ContextEnhancementModule(
             in_channels, out_channels, scale_factors)
 
-    def forward(self, xs):
+    def forward(self, xs, crop=False):
         xs_ = xs[-self.num:]
         x = self.contextEM(xs_)
-        if x.size(3) < 20:  # shufflenetv2
+        if crop:  # siamrpn++
             l = self.base_size // 2
             r = l + self.crop_size
             x = x[:, :, l:r, l:r]
@@ -123,12 +125,12 @@ class AdjustUpsampleLayer(nn.Module):
         self.crop_size = crop_size
         self.scale_factor = scale_factor
 
-    def forward(self, x):
+    def forward(self, x, crop=False):
         if self.adjust:
             x = self.conv(x)
         x = nn.functional.interpolate(
             x, scale_factor=self.scale_factor, mode='bilinear')
-        if x.size(3) < 20:
+        if crop:
             l = self.base_size // 2
             r = l + self.crop_size
             x = x[:, :, l:r, l:r]
@@ -152,13 +154,13 @@ class UpsampleAllLayer(nn.Module):
                         in_channels[i], out_channels[i], adjusts[i],
                         scale_factors[i], base_size, crop_size))
 
-    def forward(self, features):
+    def forward(self, features, crop):
         features = features[-self.num:]
         if self.num == 1:
-            return self.upsample(features)
+            return self.upsample(features, crop)
         else:
             out = []
             for i in range(self.num):
                 adj_layer = getattr(self, 'upsample' + str(i + 2))
-                out.append(adj_layer(features[i]))
+                out.append(adj_layer(features[i], crop))
             return out

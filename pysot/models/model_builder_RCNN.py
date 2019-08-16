@@ -18,7 +18,7 @@ from pysot.models.neck import get_neck
 from pysot.models.head.proposal_layer import _ProposalLayer
 from pysot.models.head.proposal_target_layer import _ProposalTargetLayer
 from faster_rcnn_lib.model.utils.config import cfg as cfg_rcnn
-from faster_rcnn_lib.model.roi_crop.modules.roi_crop import _RoICrop
+from faster_rcnn_lib.model.roi_align.modules.roi_align import RoIAlignAvg
 from faster_rcnn_lib.model.utils.net_utils import _smooth_l1_loss, \
     _affine_grid_gen, _crop_pool_layer
 
@@ -47,7 +47,8 @@ class ModelBuilder(nn.Module):
                                      **cfg.RPN.KWARGS)
         self.RCNN_proposal = _ProposalLayer()
         self.RCNN_proposal_target = _ProposalTargetLayer()
-        self.RCNN_roi_crop = _RoICrop()
+        self.RCNN_roi_align = RoIAlignAvg(
+            cfg.POOLING_SIZE, cfg.POOLING_SIZE, 1.0 / cfg.ANCHOR.STRIDE)
         self.RCNN_head_hidden = nn.Linear(512, 256)
         self.RCNN_cls_score = nn.Linear(256, 2)
         self.RCNN_bbox_pred = nn.Linear(256, 4)
@@ -137,23 +138,9 @@ class ModelBuilder(nn.Module):
 
         rois = Variable(rois)
 
-        # do roi pooling based on predicted rois
+        # roi align
         base_feat = xf.clone()
-        if cfg_rcnn.POOLING_MODE == 'crop':
-            pooled_feat, _ = _crop_pool_layer(
-                base_feat, rois.view(-1, 5), max_pool=False, stride=8.0)
-            # grid_xy = _affine_grid_gen(
-            #     rois.view(-1, 5), base_feat.size()[2:], self.grid_size)
-            # grid_yx = torch.stack([grid_xy.data[:, :, :, 1],
-            #                        grid_xy.data[:, :, :, 0]], 3).contiguous()
-            # pooled_feat = self.RCNN_roi_crop(
-            #     base_feat, Variable(grid_yx).detach())
-            # if cfg_rcnn.CROP_RESIZE_WITH_MAX_POOL:
-            #     pooled_feat = F.max_pool2d(pooled_feat, 2, 2)
-        elif cfg_rcnn.POOLING_MODE == 'align':
-            pooled_feat = self.RCNN_roi_align(base_feat, rois.view(-1, 5))
-        elif cfg_rcnn.POOLING_MODE == 'pool':
-            pooled_feat = self.RCNN_roi_pool(base_feat, rois.view(-1, 5))
+        pooled_feat = self.RCNN_roi_align(base_feat, rois.view(-1, 5))
 
         # global average pool
         pooled_feat = pooled_feat.mean([2, 3])
@@ -163,10 +150,12 @@ class ModelBuilder(nn.Module):
         zf_crop_l = zf_size // 4
         zf_crop_r = zf_crop_l + zf_size // 2
         template_feat = zf[:, :, zf_crop_l:zf_crop_r, zf_crop_l:zf_crop_r]
-        template_feat = template_feat.mean([2, 3]).expand(
-            pooled_feat.size(0), template_feat.size(1))
+        tc = template_feat.size(1)
+        template_feat = template_feat.mean([2, 3]).view(
+            batch_size, 1, tc).contiguous().expand(
+            batch_size, rois.size(1), tc).view(-1, tc)
 
-        # tail hidden
+        # hidden layer in tail
         hidden_feat = torch.cat([pooled_feat, template_feat], 1)
         hidden_feat = self.RCNN_head_hidden(hidden_feat)
 

@@ -145,9 +145,9 @@ class DepthwiseRPNSingleHead(RPN):
     def __init__(self, anchor_num=5, in_channels=256):
         super(DepthwiseRPNSingleHead, self).__init__()
         self.cls = SeperableConv2d(in_channels, 2 * anchor_num, kernel_size=3,
-                                   stride=1, padding=1, bias=False)
+                                   stride=1, padding=1)
         self.loc = SeperableConv2d(in_channels, 4 * anchor_num, kernel_size=3,
-                                   stride=1, padding=1, bias=False)
+                                   stride=1, padding=1)
 
     def forward(self, z_f, x_f):
         features = xcorr_depthwise(x_f.contiguous(), z_f.contiguous())

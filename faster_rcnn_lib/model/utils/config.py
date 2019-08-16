@@ -299,7 +299,7 @@ __C.FEAT_STRIDE = [16, ]
 
 __C.CUDA = False
 
-__C.CROP_RESIZE_WITH_MAX_POOL = True
+__C.CROP_RESIZE_WITH_MAX_POOL = False
 
 import pdb
 

@@ -108,3 +108,8 @@ testing_dataset/*
 *.DS_Store
 */.DS_Store
 **/.DS_Store
+**/results*/*
+**/snapshot*/*
+**/logs*/*
+*.avi
+*.mp4
