@@ -69,6 +69,8 @@ __C.TRAIN.CLS_WEIGHT = 1.0
 
 __C.TRAIN.LOC_WEIGHT = 1.2
 
+__C.TRAIN.OBJ_CLS_WEIGHT = 1.0
+
 __C.TRAIN.MASK_WEIGHT = 1
 
 __C.TRAIN.PRINT_FREQ = 20
@@ -135,6 +137,8 @@ __C.DATASET.NEG = 0.2
 # improve tracking performance for otb100
 __C.DATASET.GRAY = 0.0
 
+__C.DATASET.BACKGROUND = 0.0
+
 __C.DATASET.NAMES = ('VID', 'COCO', 'DET', 'YOUTUBEBB', 'MOT')
 
 __C.DATASET.VID = CN()
@@ -199,12 +203,26 @@ __C.ADJUST.KWARGS = CN(new_allowed=True)
 __C.ADJUST.TYPE = "AdjustAllLayer"
 
 # ------------------------------------------------------------------------ #
+# Specific conv layer options
+# ------------------------------------------------------------------------ #
+__C.SPECIFIC_CONV = CN()
+
+# Adjust layer
+__C.SPECIFIC_CONV.SPECIFIC_CONV = False
+
+__C.SPECIFIC_CONV.KWARGS = CN(new_allowed=True)
+
+# Adjust layer type
+__C.SPECIFIC_CONV.TYPE = "AfterCEMConv"
+
+# ------------------------------------------------------------------------ #
 # RPN options
 # ------------------------------------------------------------------------ #
 __C.RPN = CN()
 
 # RPN type
 __C.RPN.TYPE = 'MultiRPN'
+__C.RPN.WITH_OBJ = False
 
 __C.RPN.KWARGS = CN(new_allowed=True)
 
@@ -262,6 +280,8 @@ __C.TRACK.WINDOW_INFLUENCE = 0.44
 
 # Interpolation learning rate
 __C.TRACK.LR = 0.4
+
+__C.TRACK.SHOW_THRESH = 0.6
 
 # Exemplar size
 __C.TRACK.EXEMPLAR_SIZE = 127

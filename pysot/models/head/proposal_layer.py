@@ -5,7 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from faster_rcnn_lib.model.rpn.bbox_transform import bbox_transform_inv2,\
     clip_boxes
-from model.nms.nms_wrapper import nms
+from faster_rcnn_lib.model.nms.nms_wrapper import nms
+from faster_rcnn_lib.model.utils.config import cfg as cfg_rcnn
 from pysot.utils.anchor import Anchors
 from pysot.core.config import cfg
 
@@ -20,21 +21,15 @@ class _ProposalLayer(nn.Module):
 
     def __init__(self):
         super(_ProposalLayer, self).__init__()
-        self._feat_size = cfg.TRAIN.OUTPUT_SIZE
         self._feat_stride = cfg.ANCHOR.STRIDE
         self._anchor_generator = Anchors(cfg.ANCHOR.STRIDE,
                                          cfg.ANCHOR.RATIOS,
                                          cfg.ANCHOR.SCALES)
-        self._anchors = torch.from_numpy(
-            self._anchor_generator.generate_all_anchors(
-                im_c=cfg.TRAIN.SEARCH_SIZE // 2,
-                size=cfg.TRAIN.OUTPUT_SIZE
-            )[1]).float()  # centor anchors
+        self.init_size(cfg.TRAIN.SEARCH_SIZE, cfg.TRAIN.OUTPUT_SIZE)
         self._num_anchors = len(cfg.ANCHOR.RATIOS) * len(cfg.ANCHOR.SCALES)
-        self._im_size = cfg.TRAIN.SEARCH_SIZE
-        self._pre_nms_topN = 200
-        self._post_nms_topN = 30
-        self._nms_thresh = 0.7
+        self._pre_nms_topN = cfg_rcnn.TRAIN.RPN_PRE_NMS_TOP_N
+        self._post_nms_topN = cfg_rcnn.TRAIN.RPN_POST_NMS_TOP_N
+        self._nms_thresh = cfg_rcnn.TRAIN.RPN_NMS_THRESH
 
     def _log_softmax(self, cls):
         b, a2, h, w = cls.size()
@@ -44,7 +39,16 @@ class _ProposalLayer(nn.Module):
             0, 4, 1, 2, 3).contiguous().view(b, a2, h, w)
         return cls
 
-    def forward(self, pred_cls, pred_reg):
+    def init_size(self, search_size, output_size):
+        self._anchor_generator.generate_all_anchors(
+            im_c=search_size // 2,
+            size=output_size
+        )
+        self._anchors = torch.from_numpy(  # centor anchors
+            self._anchor_generator.all_anchors[1]).float().cuda()
+        self._im_size = search_size
+
+    def forward(self, pred_cls, pred_reg, post_nms_num=None):
         """
         Take RPN's output feature map as input, outputs roi proposals by using
         anchors
@@ -52,6 +56,8 @@ class _ProposalLayer(nn.Module):
             pred_cls: b, 2*A, h, w
             pred_reg: b, 4*A, h, w
         """
+        if not post_nms_num:
+            post_nms_num = self._post_nms_topN
 
         # the first set of _num_anchors channels are bg probs
         # the second set are the fg probs
@@ -60,7 +66,8 @@ class _ProposalLayer(nn.Module):
         bbox_deltas = pred_reg  # b, 4*A, h, w
 
         batch_size, fh, fw = scores.size(0), scores.size(2), scores.size(3)
-        assert fh == self._feat_size, "proposal layer: feat_size don't match!"
+        # print(scores.size())
+        # assert fh == self._feat_size, "proposal layer: feat_size don't match!"
         K = fh * fw
         A = self._num_anchors
 
@@ -74,8 +81,6 @@ class _ProposalLayer(nn.Module):
         bbox_deltas = bbox_deltas.view(batch_size, -1, 4)  # b, A*K, 4
 
         # Same story for the scores:
-        scores = scores.view(batch_size, 2, A, fh, fw).permute(
-            0, 2, 3, 4, 1).contiguous()
         scores = scores.view(batch_size, -1)  # b, A*K
 
         # Convert anchors into proposals via bbox transformations
@@ -86,7 +91,7 @@ class _ProposalLayer(nn.Module):
         scores_keep = scores  # b, A*K
         _, order = torch.sort(scores_keep, 1, True)
 
-        output = scores.new(batch_size, self._post_nms_topN, 5).zero_()
+        output = scores.new(batch_size, post_nms_num, 5).zero_()
         for i in range(batch_size):
             # 3. remove predicted boxes with either height or width <
             # threshold. (NOTE: convert min_size to input image scale
@@ -114,10 +119,10 @@ class _ProposalLayer(nn.Module):
             )
             keep_idx_i = keep_idx_i.long().view(-1)
 
-            if self._post_nms_topN > 0:
-                keep_idx_i = keep_idx_i[:self._post_nms_topN]
+            if post_nms_num > 0:
+                keep_idx_i = keep_idx_i[:post_nms_num]
             proposals_single = proposals_single[keep_idx_i, :]
-            scores_single = scores_single[keep_idx_i, :]
+            scores_single = scores_single[keep_idx_i, :].view(-1)
 
             # padding 0 at the end.
             num_proposal = proposals_single.size(0)

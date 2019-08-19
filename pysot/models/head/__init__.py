@@ -7,12 +7,15 @@ from __future__ import unicode_literals
 
 from pysot.models.head.mask import MaskCorr, Refine
 from pysot.models.head.rpn import UPChannelRPN, DepthwiseRPN, MultiRPN,\
-    DepthwiseRPNSingleHead
+    DepthwiseRPNSingleHead, DepthwiseRPNSingleHeadThick, \
+    DepthwiseRPNSingleHeadObj
 
 RPNS = {
     'UPChannelRPN': UPChannelRPN,
     'DepthwiseRPN': DepthwiseRPN,
     'DepthwiseRPNSingleHead': DepthwiseRPNSingleHead,
+    'DepthwiseRPNSingleHeadThick': DepthwiseRPNSingleHeadThick,
+    'DepthwiseRPNSingleHeadObj': DepthwiseRPNSingleHeadObj,
     'MultiRPN': MultiRPN
 }
 

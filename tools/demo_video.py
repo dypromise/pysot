@@ -11,8 +11,11 @@ import torch
 import numpy as np
 from glob import glob
 
+from faster_rcnn_lib import _init_path
+
 from pysot.core.config import cfg
 from pysot.models.model_builder import ModelBuilder
+from pysot.models.model_builder_RCNN import ModelBuilderRCNN
 from pysot.tracker.tracker_builder import build_tracker
 from pysot.utils.model_load import load_pretrain
 from cv2 import VideoWriter_fourcc
@@ -67,12 +70,13 @@ def main():
 
     # create model
     model = ModelBuilder()
+    # model = ModelBuilderRCNN()
 
     # load model
     model = load_pretrain(model, args.snapshot).eval().to(device)
 
     # build tracker
-    tracker = build_tracker(model)
+    tracker = build_tracker(model, is_demo=True)
     first_frame = True
 
     # tracking
@@ -91,6 +95,9 @@ def main():
             first_frame = False
         else:
             outputs = tracker.track(frame)
+            if outputs is None:
+                video.write(frame)
+                continue
             if 'polygon' in outputs:
                 polygon = np.array(outputs['polygon']).astype(np.int32)
                 cv2.polylines(frame, [polygon.reshape((-1, 1, 2))],
@@ -110,8 +117,13 @@ def main():
                             (x + w // 2 - 30, y + h // 2 + 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                             (0, 255, 0), 2)
-            # cv2.imshow(video_name, frame)
-            # cv2.waitKey(1)
+                # cv2.putText(frame,
+                #             '{:.3f},{:.3f}'.format(
+                #                 outputs['best_score'],
+                #                 outputs['rcnn_max_score']),
+                #             (x + w // 2 - 30, y + h // 2 + 10),
+                #             cv2.FONT_HERSHEY_SIMPLEX, 0.8,
+                #             (0, 255, 0), 2)
             video.write(frame)
             print("write frames: {}".format(i), end='\r')
 

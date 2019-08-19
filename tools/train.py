@@ -21,6 +21,8 @@ from tensorboardX import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data.distributed import DistributedSampler
 
+from faster_rcnn_lib import _init_path
+
 from pysot.utils.lr_scheduler import build_lr_scheduler
 from pysot.utils.log_helper import init_log, print_speed, add_file_handler
 from pysot.utils.distributed import dist_init, DistModule, reduce_gradients,\
@@ -29,9 +31,9 @@ from pysot.utils.model_load import load_pretrain, restore_from
 from pysot.utils.average_meter import AverageMeter
 from pysot.utils.misc import describe, commit
 from pysot.models.model_builder import ModelBuilder
+from pysot.models.model_builder_RCNN import ModelBuilderRCNN
 from pysot.datasets.dataset import TrkDataset
 from pysot.core.config import cfg
-
 
 logger = logging.getLogger('global')
 parser = argparse.ArgumentParser(description='siamrpn tracking')
@@ -299,7 +301,7 @@ def main():
 
     # create model
     model = ModelBuilder()
-    # print(model)
+    # model = ModelBuilderRCNN()
     model = model.cuda().train()
     dist_model = DistModule(model)
 

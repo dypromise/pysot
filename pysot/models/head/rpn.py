@@ -156,6 +156,57 @@ class DepthwiseRPNSingleHead(RPN):
         return cls, loc
 
 
+class DepthwiseRPNSingleHeadThick(RPN):
+    def __init__(self, anchor_num=5, in_channels=256):
+        super(DepthwiseRPNSingleHeadThick, self).__init__()
+        self.cls = nn.Sequential(
+            SeperableConv2d(in_channels, in_channels // 2, kernel_size=3,
+                            stride=1, padding=1),
+            SeperableConv2d(in_channels // 2, 2 * anchor_num, kernel_size=3,
+                            stride=1, padding=1)
+        )
+        self.loc = nn.Sequential(
+            SeperableConv2d(in_channels, in_channels // 2, kernel_size=3,
+                            stride=1, padding=1),
+            SeperableConv2d(in_channels // 2, 4 * anchor_num, kernel_size=3,
+                            stride=1, padding=1)
+        )
+
+    def forward(self, z_f, x_f):
+        features = xcorr_depthwise(x_f.contiguous(), z_f.contiguous())
+        cls = self.cls(features)
+        loc = self.loc(features)
+        return cls, loc
+
+
+class DepthwiseRPNSingleHeadObj(RPN):
+    def __init__(self, anchor_num=5, in_channels=256):
+        super(DepthwiseRPNSingleHeadObj, self).__init__()
+        self.cls = SeperableConv2d(in_channels, 2 * anchor_num,
+                                   kernel_size=3, stride=1, padding=1)
+        self.loc = SeperableConv2d(in_channels, 4 * anchor_num,
+                                   kernel_size=3, stride=1, padding=1)
+
+        self.obj_feature = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, 3,
+                      stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            SeperableConv2d(in_channels, in_channels // 2, kernel_size=3,
+                            stride=2, padding=1)
+        )
+        self.obj_cls = nn.Linear(in_channels // 2, 2)
+
+    def forward(self, z_f, x_f):
+        features = xcorr_depthwise(x_f.contiguous(), z_f.contiguous())
+        cls = self.cls(features)
+        loc = self.loc(features)
+        obj_f = self.obj_feature(features)
+        obj_f = obj_f.mean(3).mean(2)
+        obj_cls = self.obj_cls(obj_f)
+        return cls, loc, obj_cls
+
+
 class MultiRPN(RPN):
     def __init__(self, anchor_num, in_channels, weighted=False):
         super(MultiRPN, self).__init__()

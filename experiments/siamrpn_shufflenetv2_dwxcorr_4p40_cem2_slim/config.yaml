@@ -1,8 +1,8 @@
 META_ARC: "siamrpn_shufflenetv2_dwxcorr_4p40"
 
 BACKBONE:
-    TYPE: "shufflenetv2_M"
-    PRETRAINED: 'pretrained_models/shufflenetv2_M_x1.best.pth'
+    TYPE: "shufflenetv2_official"
+    PRETRAINED: 'pretrained_models/shufflenetv2_x1-5666bf0f80.pth'
     TRAIN_BLOCKS_FROM: 0
     TRAIN_EPOCH: 15
     LAYERS_LR: 0.1
@@ -11,9 +11,9 @@ ADJUST:
     ADJUST: True
     TYPE: "AdjustLayerCEM"
     KWARGS:
-        in_channels: [256,256]
+        in_channels: [232,464]
         out_channels: [256,256]
-        scale_factors: [2, 2]
+        scale_factors: [2, 4]
         base_size: 8
         crop_size: 8
 
@@ -34,9 +34,10 @@ ANCHOR:
 
 TRACK:
     TYPE: 'SiamRPNTracker'
-    PENALTY_K: 0.30
+    PENALTY_K: 0.40
     WINDOW_INFLUENCE: 0.60
-    LR: 0.30
+    LR: 0.40
+    SHOW_THRESH: 0.60
     EXEMPLAR_SIZE: 128
     INSTANCE_SIZE: 256
     BASE_SIZE: 8

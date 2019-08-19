@@ -14,10 +14,10 @@ from pysot.utils.anchor import Anchors
 from pysot.tracker.base_tracker import SiameseTracker
 
 
-class SiamRPNTracker(SiameseTracker):
-    def __init__(self, model, is_demo=False):
-        super(SiamRPNTracker, self).__init__()
-        self.score_size = (cfg.TRACK.INSTANCE_SIZE - cfg.TRACK.EXEMPLAR_SIZE)\
+class SiamRCNNTracker(SiameseTracker):
+    def __init__(self, model):
+        super(SiamRCNNTracker, self).__init__()
+        self.score_size = (cfg.TRACK.INSTANCE_SIZE - cfg.TRACK.EXEMPLAR_SIZE) \
             // cfg.ANCHOR.STRIDE + 1 + cfg.TRACK.BASE_SIZE
         self.anchor_num = len(cfg.ANCHOR.RATIOS) * len(cfg.ANCHOR.SCALES)
         hanning = np.hanning(self.score_size)
@@ -25,8 +25,8 @@ class SiamRPNTracker(SiameseTracker):
         self.window = np.tile(window.flatten(), self.anchor_num)
         self.anchors = self.generate_anchor(self.score_size)
         self.model = model
+        self.model.reset_size(cfg.TRACK.INSTANCE_SIZE, self.score_size)
         self.model.eval()
-        self.is_demo = is_demo
 
     def generate_anchor(self, score_size):
         anchors = Anchors(cfg.ANCHOR.STRIDE,
@@ -112,12 +112,21 @@ class SiamRPNTracker(SiameseTracker):
                                     cfg.TRACK.INSTANCE_SIZE,
                                     round(s_x), self.channel_average)
 
-        start = time.time()
+        # start = time.time()
         outputs = self.model.track(x_crop)
         # print("forward: ", time.time() - start)
 
         score = self._convert_score(outputs['cls'])
         pred_bbox = self._convert_bbox(outputs['loc'], self.anchors)
+
+        # rcnn output
+        rcnn_score = outputs['rcnn_max_score'].data.cpu().numpy()[0]
+        # rcnn_bbox = outputs['rcnn_max_bbox'].data.cpu().numpy()[0]
+        # x1, y1, x2, y2 = rcnn_bbox
+        # xc = (x1 + x2) // 2
+        # yc = (y1 + y2) // 2
+        # w, h = x2 - x1 + 1, y2 - y1 + 1
+        # rcnn_bbox = np.array([xc, yc, w, h])
 
         def change(r):
             return np.maximum(r, 1. / r)
@@ -141,12 +150,11 @@ class SiamRPNTracker(SiameseTracker):
             self.window * cfg.TRACK.WINDOW_INFLUENCE
         best_idx = np.argmax(pscore)
 
-        # when score is low, we will not update bbox
-        if self.is_demo and score[best_idx] < cfg.TRACK.SHOW_THRESH:
-            return None
-
         bbox = pred_bbox[:, best_idx] / scale_z
         lr = penalty[best_idx] * score[best_idx] * cfg.TRACK.LR
+
+        # mix
+        # bbox = (bbox + rcnn_bbox) / 2
 
         cx = bbox[0] + self.center_pos[0]
         cy = bbox[1] + self.center_pos[1]
@@ -170,5 +178,6 @@ class SiamRPNTracker(SiameseTracker):
         best_score = score[best_idx]
         return {
             'bbox': bbox,
-            'best_score': best_score
+            'best_score': best_score,
+            'rcnn_max_score': rcnn_score
         }

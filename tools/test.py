@@ -12,8 +12,11 @@ import cv2
 import torch
 import numpy as np
 
+from faster_rcnn_lib import _init_path
+
 from pysot.core.config import cfg
 from pysot.models.model_builder import ModelBuilder
+from pysot.models.model_builder_RCNN import ModelBuilderRCNN
 from pysot.tracker.tracker_builder import build_tracker
 from pysot.utils.bbox import get_axis_aligned_bbox
 from pysot.utils.model_load import load_pretrain
@@ -47,7 +50,8 @@ def main():
     dataset_root = os.path.join(cur_dir, '../testing_dataset', args.dataset)
 
     # create model
-    model = ModelBuilder()
+    # model = ModelBuilder()
+    model = ModelBuilderRCNN()
 
     # load model
     model = load_pretrain(model, args.snapshot).eval().to(device)

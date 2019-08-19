@@ -70,16 +70,25 @@ def main():
     model = load_pretrain_cpu(model, args.snapshot).eval().to(device)
 
     # build tracker
-    tracker = build_tracker(model)
+    tracker = build_tracker(model, is_demo=True)
 
+    # window
     first_frame = True
     if args.video_name:
         video_name = args.video_name.split('/')[-1].split('.')[0]
     else:
         video_name = 'webcam'
     cv2.namedWindow(video_name, cv2.WND_PROP_FULLSCREEN)
-    cv2.resizeWindow(video_name, 640, 480)
+    cv2.resizeWindow(video_name, 960, 640)
 
+    # video writer
+    fps = 24
+    fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+    tframe = list(get_frames(args.video_name))[0]
+    size = (tframe.shape[1], tframe.shape[0])
+    video = cv2.VideoWriter("demo_res.avi", fourcc, fps, size)
+
+    # track
     for frame in get_frames(args.video_name):
         if first_frame:
             try:
@@ -89,11 +98,12 @@ def main():
             tracker.init(frame, init_rect)
             first_frame = False
         else:
-
-            start = time.time()
             outputs = tracker.track(frame)
-            end = time.time()
-            print(end - start)
+            if outputs is None:
+                cv2.imshow(video_name, frame)
+                cv2.waitKey(1)
+                video.write(frame)
+                continue
 
             if 'polygon' in outputs:
                 polygon = np.array(outputs['polygon']).astype(np.int32)
@@ -116,8 +126,7 @@ def main():
                             (0, 255, 0), 2)
             cv2.imshow(video_name, frame)
             cv2.waitKey(1)
-            # video.write(frame)
-            # print("write frames: {}".format(i), end='\r')
+            video.write(frame)
 
 
 if __name__ == '__main__':

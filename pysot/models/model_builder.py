@@ -13,7 +13,7 @@ from pysot.models.loss import select_cross_entropy_loss, weight_l1_loss
 from pysot.models.backbone import get_backbone
 from pysot.models.head import get_rpn_head, get_mask_head, get_refine_head
 from pysot.models.neck import get_neck
-import time
+# import time
 
 
 class ModelBuilder(nn.Module):
@@ -29,6 +29,13 @@ class ModelBuilder(nn.Module):
             self.neck = get_neck(cfg.ADJUST.TYPE,
                                  **cfg.ADJUST.KWARGS)
 
+        # branch specific conv
+        if cfg.SPECIFIC_CONV.SPECIFIC_CONV:
+            self.sconv_z = get_neck(cfg.SPECIFIC_CONV.TYPE,
+                                    **cfg.SPECIFIC_CONV.KWARGS)
+            self.sconv_x = get_neck(cfg.SPECIFIC_CONV.TYPE,
+                                    **cfg.SPECIFIC_CONV.KWARGS)
+
         # build rpn head
         self.rpn_head = get_rpn_head(cfg.RPN.TYPE,
                                      **cfg.RPN.KWARGS)
@@ -37,7 +44,6 @@ class ModelBuilder(nn.Module):
         if cfg.MASK.MASK:
             self.mask_head = get_mask_head(cfg.MASK.TYPE,
                                            **cfg.MASK.KWARGS)
-
             if cfg.REFINE.REFINE:
                 self.refine_head = get_refine_head(cfg.REFINE.TYPE)
 
@@ -45,26 +51,31 @@ class ModelBuilder(nn.Module):
         zf = self.backbone(z)
         if cfg.MASK.MASK:
             zf = zf[-1]
+
         if cfg.ADJUST.ADJUST:
-            zf = self.neck(zf, crop=True)  # siamrppn++
+            z_crop = True
+            if cfg.SPECIFIC_CONV.SPECIFIC_CONV:
+                z_crop = False
+            zf = self.neck(zf, crop=z_crop)
+
+        if cfg.SPECIFIC_CONV.SPECIFIC_CONV:
+            zf = self.sconv_z(zf, crop=True)
+
         self.zf = zf
 
     def track(self, x):
-        # start = time.time()
         xf = self.backbone(x)
-        # end1 = time.time()
-        # print("backbone: ", end1 - start)
         if cfg.MASK.MASK:
             self.xf = xf[:-1]
             xf = xf[-1]
+
         if cfg.ADJUST.ADJUST:
             xf = self.neck(xf, crop=False)
-            # end2 = time.time()
-            # print("neck: ", end2 - end1)
+
+        if cfg.SPECIFIC_CONV.SPECIFIC_CONV:
+            xf = self.sconv_x(xf, crop=False)
 
         cls, loc = self.rpn_head(self.zf, xf)
-        # end3 = time.time()
-        # print("rpn: ", end3 - end2)
 
         if cfg.MASK.MASK:
             mask, self.mask_corr_feature = self.mask_head(self.zf, xf)
@@ -92,19 +103,32 @@ class ModelBuilder(nn.Module):
         label_cls = data['label_cls'].cuda()
         label_loc = data['label_loc'].cuda()
         label_loc_weight = data['label_loc_weight'].cuda()
+        label_obj_cls = data['label_obj_cls'].cuda()  # b
 
         # get feature
         zf = self.backbone(template)
         xf = self.backbone(search)
+
         if cfg.MASK.MASK:
             zf = zf[-1]
             self.xf_refine = xf[:-1]
             xf = xf[-1]
+
         if cfg.ADJUST.ADJUST:
-            zf = self.neck(zf, crop=True)
+            z_crop = True
+            if cfg.SPECIFIC_CONV.SPECIFIC_CONV:
+                z_crop = False
+            zf = self.neck(zf, crop=z_crop)
             xf = self.neck(xf, crop=False)
 
-        cls, loc = self.rpn_head(zf, xf)
+        if cfg.SPECIFIC_CONV.SPECIFIC_CONV:
+            zf = self.sconv_z(zf, crop=True)
+            xf = self.sconv_x(xf, crop=False)
+
+        if cfg.RPN.WITH_OBJ:
+            cls, loc, obj_cls = self.rpn_head(zf, xf)
+        else:
+            cls, loc = self.rpn_head(zf, xf)
 
         # get loss
         cls = self.log_softmax(cls)
@@ -116,6 +140,12 @@ class ModelBuilder(nn.Module):
             cfg.TRAIN.LOC_WEIGHT * loc_loss
         outputs['cls_loss'] = cls_loss
         outputs['loc_loss'] = loc_loss
+
+        if cfg.RPN.WITH_OBJ:
+            obj_cls = F.log_softmax(obj_cls, dim=1)
+            obj_cls_loss = F.nll_loss(obj_cls, label_obj_cls)
+            outputs['obj_loss'] = obj_cls_loss
+            outputs['total_loss'] += cfg.TRAIN.OBJ_CLS_WEIGHT * obj_cls_loss
 
         if cfg.MASK.MASK:
             # TODO

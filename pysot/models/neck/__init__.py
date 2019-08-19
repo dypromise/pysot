@@ -7,11 +7,12 @@ from __future__ import unicode_literals
 
 
 from pysot.models.neck.neck import AdjustLayer, AdjustAllLayer, \
-    AdjustLayerCEM, UpsampleAllLayer
+    AdjustLayerCEM, UpsampleAllLayer, AfterCEMConv
 
 NECKS = {
     'AdjustLayer': AdjustLayer,
     'AdjustLayerCEM': AdjustLayerCEM,
+    'AfterCEMConv': AfterCEMConv,
     'AdjustAllLayer': AdjustAllLayer,
     'UpsampleAllLayer': UpsampleAllLayer
 }

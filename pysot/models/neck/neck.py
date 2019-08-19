@@ -66,6 +66,23 @@ class AdjustAllLayer(nn.Module):
             return out
 
 
+class AfterCEMConv(nn.Module):
+    def __init__(self, in_channels, out_channels, base_size=8, crop_size=8):
+        super(AfterCEMConv, self).__init__()
+        self.base_size = base_size
+        self.crop_size = crop_size
+        self.conv = SeperableConv2d(in_channels, out_channels,
+                                    kernel_size=3, padding=1)
+
+    def forward(self, x, crop=False):
+        x = self.conv(x)
+        if crop:
+            l = self.base_size // 2
+            r = l + self.crop_size
+            x = x[:, :, l:r, l:r]
+        return x
+
+
 class AdjustLayerCEM(nn.Module):
     def __init__(self, in_channels, out_channels, scale_factors,
                  base_size=8, crop_size=7):
@@ -111,6 +128,58 @@ class ContextEnhancementModule(nn.Module):
                 x, scale_factor=self.scale_factors[i], mode='bilinear')
             out.append(x)
         return sum(out)
+
+
+class AttentionZ(nn.Module):
+    def __init__(self, in_channel, out_channel=1):
+        super(AttentionZ, self).__init__()
+        self.downsample1 = SeperableConv2d(
+            in_channel, in_channel, kernel_size=3, stride=2, padding=1)
+        self.conv1 = SeperableConv2d(
+            in_channel, out_channel, kernel_size=3, padding=1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, z):
+        z = self.downsample1(z)
+        z = self.conv1(z)
+        z = nn.functional.interpolate(z, scale_factor=2, mode='bilinear')
+        z = self.sigmoid(z)
+
+    def _initialize_weights(self):
+        for name, m in self.named_modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.ones_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0001)
+                nn.init.constant_(m.running_mean, 0)
+
+
+class AttentionX(nn.Module):
+    def __init__(self, in_channel, out_channel=1):
+        super(AttentionX, self).__init__()
+        self.conv1 = SeperableConv2d(
+            in_channel, out_channel, kernel_size=3, padding=1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, z):
+        z = self.conv1(z)
+        z = self.sigmoid(z)
+
+    def _initialize_weights(self):
+        for name, m in self.named_modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.ones_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0001)
+                nn.init.constant_(m.running_mean, 0)
 
 
 class AdjustUpsampleLayer(nn.Module):

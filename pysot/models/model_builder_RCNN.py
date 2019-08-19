@@ -19,8 +19,8 @@ from pysot.models.head.proposal_layer import _ProposalLayer
 from pysot.models.head.proposal_target_layer import _ProposalTargetLayer
 from faster_rcnn_lib.model.utils.config import cfg as cfg_rcnn
 from faster_rcnn_lib.model.roi_align.modules.roi_align import RoIAlignAvg
-from faster_rcnn_lib.model.utils.net_utils import _smooth_l1_loss, \
-    _affine_grid_gen, _crop_pool_layer
+from faster_rcnn_lib.model.utils.net_utils import _smooth_l1_loss
+from faster_rcnn_lib.model.rpn.bbox_transform import bbox_transform_inv
 
 
 def _center2corner_batch(center):
@@ -35,49 +35,106 @@ def _center2corner_batch(center):
     return np.vstack((x1, y1, x2, y2)).transpose()
 
 
-class ModelBuilder(nn.Module):
+class ModelBuilderRCNN(nn.Module):
     def __init__(self):
-        super(ModelBuilder, self).__init__()
+        super(ModelBuilderRCNN, self).__init__()
 
-        self.RCNN_base = get_backbone(cfg.BACKBONE.TYPE,
-                                      **cfg.BACKBONE.KWARGS)
-        self.RCNN_neck = get_neck(cfg.ADJUST.TYPE,
-                                  **cfg.ADJUST.KWARGS)
-        self.RCNN_rpn = get_rpn_head(cfg.RPN.TYPE,
+        self.backbone = get_backbone(cfg.BACKBONE.TYPE,
+                                     **cfg.BACKBONE.KWARGS)
+        self.neck = get_neck(cfg.ADJUST.TYPE,
+                             **cfg.ADJUST.KWARGS)
+        self.rpn_head = get_rpn_head(cfg.RPN.TYPE,
                                      **cfg.RPN.KWARGS)
         self.RCNN_proposal = _ProposalLayer()
         self.RCNN_proposal_target = _ProposalTargetLayer()
         self.RCNN_roi_align = RoIAlignAvg(
-            cfg.POOLING_SIZE, cfg.POOLING_SIZE, 1.0 / cfg.ANCHOR.STRIDE)
+            cfg_rcnn.POOLING_SIZE,
+            cfg_rcnn.POOLING_SIZE, 1.0 / cfg.ANCHOR.STRIDE)
         self.RCNN_head_hidden = nn.Linear(512, 256)
         self.RCNN_cls_score = nn.Linear(256, 2)
         self.RCNN_bbox_pred = nn.Linear(256, 4)
-        self.grid_size = cfg_rcnn.POOLING_SIZE * 2 if \
-            cfg_rcnn.CROP_RESIZE_WITH_MAX_POOL else cfg_rcnn.POOLING_SIZE
         self.training = True
+
+    def reset_size(self, image_size, output_size):
+        self.RCNN_proposal.init_size(image_size, output_size)
 
     def template(self, z):
         zf = self.backbone(z)
         if cfg.MASK.MASK:
             zf = zf[-1]
         if cfg.ADJUST.ADJUST:
-            zf = self.neck(zf)
+            zf = self.neck(zf, crop=True)
         self.zf = zf
+        zf_size = self.zf.size(3)
+        zf_crop_l = zf_size // 4
+        zf_crop_r = zf_crop_l + zf_size // 2
+        template_feat = self.zf[
+            :, :, zf_crop_l:zf_crop_r, zf_crop_l:zf_crop_r]
+        self.template_feat = template_feat.mean(3).mean(2)
 
     def track(self, x):
+        batch_size = x.size(0)
+
         xf = self.backbone(x)
-        if cfg.MASK.MASK:
-            self.xf = xf[:-1]
-            xf = xf[-1]
         if cfg.ADJUST.ADJUST:
-            xf = self.neck(xf)
+            xf = self.neck(xf, crop=False)
+
         cls, loc = self.rpn_head(self.zf, xf)
-        if cfg.MASK.MASK:
-            mask, self.mask_corr_feature = self.mask_head(self.zf, xf)
+
+        #########################
+        #      Second Stage
+        #########################
+        # roi proposals
+        rois = self.RCNN_proposal(cls, loc, post_nms_num=9)  # b, num_rois, 5
+
+        # c-stage output
+        c_boxes = rois[:, :, 1:5]  # b, num_rois, 4
+        c_scores = rois[:, :, 0]  # b, num_rois
+
+        # roi align
+        base_feat = xf
+        pooled_feat = self.RCNN_roi_align(base_feat, rois.view(-1, 5))
+        pooled_feat = pooled_feat.mean(3).mean(2)  # b * num_rois, c
+
+        # pooling zf feat
+        tc = self.template_feat.size(1)  # b, c
+        template_feat = self.template_feat.contiguous().view(
+            batch_size, 1, tc).expand(batch_size, rois.size(1), tc).contiguous(
+        ).view(-1, tc)
+
+        # hidden layer in tail
+        hidden_feat = torch.cat([pooled_feat, template_feat], 1)
+        hidden_feat = self.RCNN_head_hidden(hidden_feat)
+
+        # compute bbox offset and classification probability
+        f_bbox_pred = self.RCNN_bbox_pred(hidden_feat)
+        f_cls_score = self.RCNN_cls_score(hidden_feat)
+
+        # f-stage output
+        f_cls_prob = F.softmax(f_cls_score, 1)[:, -1]
+        f_scores = f_cls_prob.view(batch_size, rois.size(1))  # b, num_rois
+        f_bbox_pred = f_bbox_pred.view(batch_size, rois.size(1), -1)
+        # f_boxes = bbox_transform_inv(c_boxes, f_bbox_pred, batch_size)
+
+        w_cls = 1.0
+        # w_box = 2
+
+        scores = c_scores * (1 - w_cls) + f_scores * w_cls
+        # a = c_scores / (w_box * f_scores + c_scores)
+        # b = 1.0 - a
+        # bboxes = a * c_boxes + b * f_boxes
+        # bboxes = c_boxes
+
+        score, max_score_idx = torch.max(scores, 1)  # b
+        offset = torch.arange(0, batch_size) * rois.size(1)
+        offset = offset.view(-1).type_as(max_score_idx) + max_score_idx
+
         return {
             'cls': cls,
             'loc': loc,
-            'mask': mask if cfg.MASK.MASK else None
+            'rcnn_max_score': score,  # b
+            # 'rcnn_max_bbox': bboxes.contiguous().view(
+            #     -1, bboxes.size(2))[offset].view(batch_size, -1)  # b, 4
         }
 
     def mask_refine(self, pos):
@@ -103,18 +160,18 @@ class ModelBuilder(nn.Module):
         bbox = data['bbox'].numpy()  # b,4
         bbox = torch.from_numpy(_center2corner_batch(bbox)).long()
         gt_boxes = torch.cat([bbox.unsqueeze(1), torch.ones(
-            batch_size, 1, 1).long()], 2).cuda()  # b, 1, 5
+            batch_size, 1, 1).long()], 2).float().cuda()  # b, 1, 5
 
         # get backbone feature
-        zf = self.RCNN_base(template)
-        xf = self.RCNN_base(search)
+        zf = self.backbone(template)
+        xf = self.backbone(search)
 
         # get neck feature
-        zf = self.RCNN_neck(zf)
-        xf = self.RCNN_neck(xf)
+        zf = self.neck(zf, crop=True)
+        xf = self.neck(xf, crop=False)
 
         # rpn result
-        cls, loc = self.RCNN_rpn(zf, xf)
+        cls, loc = self.rpn_head(zf, xf)
 
         # roi proposals
         rois = self.RCNN_proposal(cls, loc)  # b, num_rois, 5
@@ -143,7 +200,7 @@ class ModelBuilder(nn.Module):
         pooled_feat = self.RCNN_roi_align(base_feat, rois.view(-1, 5))
 
         # global average pool
-        pooled_feat = pooled_feat.mean([2, 3])
+        pooled_feat = pooled_feat.mean(3).mean(2)
 
         # pooling zf feat
         zf_size = zf.size(3)
@@ -151,9 +208,9 @@ class ModelBuilder(nn.Module):
         zf_crop_r = zf_crop_l + zf_size // 2
         template_feat = zf[:, :, zf_crop_l:zf_crop_r, zf_crop_l:zf_crop_r]
         tc = template_feat.size(1)
-        template_feat = template_feat.mean([2, 3]).view(
-            batch_size, 1, tc).contiguous().expand(
-            batch_size, rois.size(1), tc).view(-1, tc)
+        template_feat = template_feat.mean(3).mean(2).contiguous().view(
+            batch_size, 1, tc).expand(batch_size, rois.size(1), tc).contiguous(
+        ).view(-1, tc)
 
         # hidden layer in tail
         hidden_feat = torch.cat([pooled_feat, template_feat], 1)

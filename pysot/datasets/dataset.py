@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 from torch.utils.data import Dataset
 
-from pysot.utils.bbox import center2corner, Center
+from pysot.utils.bbox import center2corner, Center, Corner
 from pysot.datasets.anchor_target import AnchorTarget
 from pysot.datasets.augmentation import Augmentation
 from pysot.core.config import cfg
@@ -229,6 +229,13 @@ class TrkDataset(Dataset):
         bbox = center2corner(Center(cx, cy, w, h))
         return bbox
 
+    def _random_bbox(self, img_w, img_h):
+        width = np.random.randint(1, img_w // 2)
+        height = np.random.randint(1, img_h // 2)
+        x = np.random.randint(0, img_w - width)
+        y = np.random.randint(0, img_h - height)
+        return x, y, x + width, y + height
+
     def __len__(self):
         return self.num
 
@@ -238,11 +245,17 @@ class TrkDataset(Dataset):
 
         gray = cfg.DATASET.GRAY and cfg.DATASET.GRAY > np.random.random()
         neg = cfg.DATASET.NEG and cfg.DATASET.NEG > np.random.random()
+        bg = cfg.DATASET.BACKGROUND and cfg.DATASET.BACKGROUND > \
+            np.random.random()
+
+        # object exists
+        label_obj_cls = 1
 
         # get one dataset
         if neg:
             template = dataset.get_random_target(index)
             search = np.random.choice(self.all_dataset).get_random_target()
+            label_obj_cls = 0
         else:
             template, search = dataset.get_positive_pair(index)
 
@@ -253,6 +266,12 @@ class TrkDataset(Dataset):
         # get bounding box
         template_box = self._get_bbox(template_image, template[1])
         search_box = self._get_bbox(search_image, search[1])
+
+        # random chose bbox as bg
+        if neg and bg:
+            h, w = search_image.shape[:2]
+            x1, y1, x2, y2 = self._random_bbox(w, h)
+            search_box = Corner(x1, y1, x2, y2)
 
         # augmentation
         template, _ = self.template_aug(template_image,
@@ -276,5 +295,6 @@ class TrkDataset(Dataset):
             'label_cls': cls,
             'label_loc': delta,
             'label_loc_weight': delta_weight,
-            'bbox': np.array(bbox)
+            'bbox': np.array(bbox),
+            'label_obj_cls': label_obj_cls
         }

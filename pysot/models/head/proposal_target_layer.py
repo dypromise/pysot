@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from faster_rcnn_lib.model.utils.config import cfg
+from faster_rcnn_lib.model.utils.config import cfg as cfg_rcnn
 from faster_rcnn_lib.model.rpn.bbox_transform import bbox_overlaps_batch,\
     bbox_transform_batch
 
@@ -29,13 +30,15 @@ class _ProposalTargetLayer(nn.Module):
         self.BBOX_NORMALIZE_STDS = self.BBOX_NORMALIZE_STDS.type_as(gt_boxes)
         self.BBOX_INSIDE_WEIGHTS = self.BBOX_INSIDE_WEIGHTS.type_as(gt_boxes)
 
-        gt_boxes_append = gt_boxes.new(gt_boxes.size()).zero_()
-        gt_boxes_append[:, :, 1:5] = gt_boxes[:, :, :4]
+        b, n, d = gt_boxes.size()
+        gt_boxes_append = gt_boxes.new(b, 5 * n, d).zero_()
+        gt_boxes_append[:, :, 1:5] = gt_boxes[:, :, :4].repeat(
+            1, 5, 1)  # at least 5 positive sample
 
         # Include ground-truth boxes in the set of candidate rois
-        # all_rois = torch.cat([all_rois, gt_boxes_append], 1)
-        rois_per_image = all_rois.size(1)
-        fg_rois_per_image = rois_per_image // 3
+        all_rois = torch.cat([all_rois, gt_boxes_append], 1)
+        rois_per_image = cfg_rcnn.TRAIN.ROIS_PER_IMAGE
+        fg_rois_per_image = int(rois_per_image * cfg_rcnn.TRAIN.FG_FRACTION)
 
         (labels, rois, bbox_targets, bbox_inside_weights
          ) = self._sample_rois_pytorch(
@@ -129,7 +132,7 @@ class _ProposalTargetLayer(nn.Module):
         offset = offset.view(-1, 1).type_as(gt_assignment) + gt_assignment
 
         labels = gt_boxes[:, :, 4].contiguous(
-        ).view(-1).index((offset.view(-1),)).view(batch_size, -1)  # all 1
+        ).view(-1)[offset.view(-1)].view(batch_size, -1)  # all 1
 
         labels_batch = labels.new(batch_size, rois_per_image).fill_(-1)
         rois_batch = all_rois.new(batch_size, rois_per_image, 5).zero_()
@@ -145,8 +148,7 @@ class _ProposalTargetLayer(nn.Module):
             # Select background RoIs as those within [BG_THRESH_LO,
             # BG_THRESH_HI)
             bg_inds = torch.nonzero(
-                (max_overlaps[i] < cfg.TRAIN.BG_THRESH_HI) &
-                (max_overlaps[i] >= cfg.TRAIN.BG_THRESH_LO)).view(-1)
+                (max_overlaps[i] < cfg.TRAIN.BG_THRESH_HI)).view(-1)
             bg_num_rois = bg_inds.numel()
 
             if fg_num_rois > 0 and bg_num_rois > 0:
